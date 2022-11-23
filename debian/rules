@@ -1,11 +1,13 @@
 #!/usr/bin/make -f
 
-DEB_LDFLAGS_MAINT_APPEND=-Wl,--as-needed
 DEB_BUILD_MAINT_OPTIONS=hardening=+all
 
 include /usr/share/dpkg/architecture.mk
 include /usr/share/dpkg/pkg-info.mk
 include /usr/share/dpkg/vendor.mk
+
+export VLC_COMPILE_BY=$(DEB_VENDOR) buildd for $(DEB_DISTRIBUTION)
+export VLC_COMPILE_HOST=$(DEB_VENDOR) $(DEB_HOST_ARCH) buildd
 
 # custom build option: debug
 # VLC enables assertions if --enable-debug is passed to the configure script. To debug issues, it
@@ -29,13 +31,13 @@ confflags += \
 confflags += \
 	--enable-a52 \
 	--enable-aa \
-	--enable-aom \
 	--enable-aribsub \
 	--enable-avahi \
 	--enable-bluray \
 	--enable-caca \
 	--enable-chromaprint \
 	--enable-chromecast \
+	--enable-dav1d \
 	--enable-dbus \
 	--enable-dca \
 	--enable-dvbpsi \
@@ -54,7 +56,6 @@ confflags += \
 	--enable-libmpeg2 \
 	--enable-libxml2 \
 	--enable-lirc \
-	--enable-live555 \
 	--enable-mad \
 	--enable-matroska \
 	--enable-mod \
@@ -78,6 +79,7 @@ confflags += \
 	--enable-soxr \
 	--enable-spatialaudio \
 	--enable-speex \
+	--enable-srt \
 	--enable-svg \
 	--enable-svgdec \
 	--enable-taglib \
@@ -93,6 +95,8 @@ confflags += \
 	--with-kde-solid=/usr/share/solid/actions/ \
 	$(NULL)
 # Reasons for disabling features:
+# aom: dav1d support enabled
+# crystalhd: unusble without firmware (#934242)
 # d3d11va: Windows only
 # decklink: not in Debian
 # directx: Windows only
@@ -100,10 +104,11 @@ confflags += \
 # dxva2: Windows only
 # fdkaac: in Debian contrib
 # fluidlite: fluidsynth is enabled
-# freerdp: scheduled for removal (#888323)
+# freerdp: removed from Debian (#888323)
 # goom: not in Debian
 # gst-decode: not needed when having libavcodec
 # libtar: security issue (#737534)
+# live555: non-free code from RFC 3550 (#981439)
 # macosx*: MacOX only
 # microdns: functionality already provided by avahi
 # mfx: currently not supported on Linux
@@ -111,12 +116,13 @@ confflags += \
 # projectm: broken
 # schroedinger: removed from Debian (#845037)
 # sparkle: MacOS X only
-# srt: not in Debian
 # telx: incompatible with zvbi
 # vpx: not needed when having libavcodec
 # vsxu: not in Debian
 # wasapi: Windows only
 confflags += \
+	--disable-aom \
+	--disable-crystalhd \
 	--disable-d3d11va \
 	--disable-decklink \
 	--disable-directx \
@@ -128,26 +134,26 @@ confflags += \
 	--disable-goom \
 	--disable-gst-decode \
 	--disable-libtar \
+	--disable-live555 \
 	--disable-macosx \
 	--disable-macosx-avfoundation \
 	--disable-macosx-qtkit \
-	--disable-microdns \
 	--disable-mfx \
+	--disable-microdns \
 	--disable-opencv \
 	--disable-projectm \
 	--disable-schroedinger \
 	--disable-sparkle \
-	--disable-srt \
 	--disable-telx \
 	--disable-vpx \
 	--disable-vsxu \
 	--disable-wasapi \
 	$(NULL)
 
+removeplugins += libva
+
 # Linux specific flags
 ifeq ($(DEB_HOST_ARCH_OS),linux)
-# omxil should be enabled on all systems, but libomxil-bellagio does
-# not build on kfreebsd and hurd (currently).
 # V4L2 is disabled on kFreeBSD due to a build failure.
 confflags += \
 	--enable-alsa \
@@ -156,7 +162,6 @@ confflags += \
 	--enable-libplacebo \
 	--enable-linsys \
 	--enable-nfs \
-	--enable-omxil \
 	--enable-udev \
 	--enable-v4l2 \
 	--enable-wayland \
@@ -169,7 +174,6 @@ confflags += \
 	--disable-libplacebo \
 	--disable-linsys \
 	--disable-nfs \
-	--disable-omxil \
 	--disable-udev \
 	--disable-v4l2 \
 	--disable-wayland \
@@ -183,7 +187,6 @@ removeplugins += \
 	fb \
 	linsys \
 	nfs \
-	omxil \
 	systemd \
 	udev \
 	v4l2 \
@@ -194,7 +197,6 @@ endif
 # Linux and kFreeBSD specific flags (disabled on Hurd)
 ifeq (,$(filter-out linux kfreebsd,$(DEB_HOST_ARCH_OS)))
 confflags += \
-	--enable-libva \
 	--enable-vcd \
 	--enable-smbclient \
 	$(NULL)
@@ -219,14 +221,6 @@ else
 # Note: Use PulseAudio/ALSA on Linux instead of OSS.
 confflags += --disable-oss
 removeplugins += oss
-endif
-
-# Linux amd64 and i386 specific flags
-ifeq (,$(filter-out amd64 i386,$(DEB_HOST_ARCH)))
-confflags += --enable-crystalhd
-else
-confflags += --disable-crystalhd
-removeplugins += crystalhd
 endif
 
 ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
@@ -270,17 +264,21 @@ DEB_CXXFLAGS_MAINT_APPEND += -mtune=8548
 endif
 endif
 
+# Raspbian specifc flags
+ifeq ($(shell dpkg-vendor --derives-from Raspbian && echo yes),yes)
+confflags += --enable-omxil --enable-omxil-vout --enable-rpi-omxil
+else
+confflags += --disable-omxil
+removeplugins += omxil
+endif
+
 export DEB_BUILD_MAINT_OPTIONS
 export DEB_CFLAGS_MAINT_APPEND
 export DEB_CXXFLAGS_MAINT_APPEND
-export DEB_LDFLAGS_MAINT_APPEND
 export removeplugins
 
 %:
 	dh $@
-
-override_dh_autoreconf:
-	dh_autoreconf --as-needed
 
 override_dh_auto_configure:
 	dh_auto_configure -- $(confflags)
@@ -324,9 +322,6 @@ ifeq (Ubuntu,$(DEB_VENDOR))
 endif
 	# Create empty directory for plugins.dat
 	mkdir -p debian/libvlc-bin/usr/lib/${DEB_HOST_MULTIARCH}/vlc/plugins
-
-override_dh_missing:
-	dh_missing --fail-missing
 
 override_dh_installchangelogs:
 	dh_installchangelogs NEWS

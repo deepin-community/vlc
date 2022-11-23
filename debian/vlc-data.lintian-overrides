@@ -1,2 +1,0 @@
-#overrides privacy-breach-uses-embedded-file
-vlc-data: privacy-breach-uses-embedded-file usr/share/vlc/lua/*
