@@ -2,7 +2,7 @@
  * freetype.c : Put text on the video, using freetype2
  *****************************************************************************
  * Copyright (C) 2002 - 2015 VLC authors and VideoLAN
- * $Id: 80c5e4eacb90d48f77d662afff6acb64828414ff $
+ * $Id: c30749ce29439ac10b7b422d737478d1cc97b52b $
  *
  * Authors: Sigmund Augdal Helberg <dnumgis@videolan.org>
  *          Gildas Bazin <gbazin@videolan.org>
@@ -273,20 +273,22 @@ static FT_Vector GetAlignedOffset( const line_desc_t *p_line,
                                    int i_align )
 {
     FT_Vector offsets = { 0, 0 };
+
+    /* aligns left to textbbox's min first */
+    offsets.x = p_textbbox->xMin - p_line->bbox.xMin;
+
     const int i_text_width = p_textbbox->xMax - p_textbbox->xMin;
     if ( p_line->i_width < i_text_width &&
         (i_align & SUBPICTURE_ALIGN_LEFT) == 0 )
     {
         /* Left offset to take into account alignment */
         if( i_align & SUBPICTURE_ALIGN_RIGHT )
-            offsets.x = ( i_text_width - p_line->i_width );
+            offsets.x += ( i_text_width - p_line->i_width );
         else /* center */
-            offsets.x = ( i_text_width - p_line->i_width ) / 2;
+            offsets.x += ( i_text_width - p_line->i_width ) / 2;
     }
-    else
-    {
-        offsets.x = p_textbbox->xMin - p_line->bbox.xMin;
-    }
+    /* else already left aligned */
+
     return offsets;
 }
 
@@ -1224,7 +1226,7 @@ static int Render( filter_t *p_filter, subpicture_region_t *p_region_out,
     if( (unsigned)i_margin * 2 >= i_max_width || (unsigned)i_margin * 2 >= i_max_height )
         i_margin = 0;
 
-    /* Don't attempt to render text that couldn't be layed out
+    /* Don't attempt to render text that couldn't be laid out
      * properly. */
     if( !rv && i_text_length > 0 && bbox.xMin < bbox.xMax && bbox.yMin < bbox.yMax )
     {
@@ -1401,7 +1403,7 @@ static int Create( vlc_object_t *p_this )
 
     p_sys->i_scale = 100;
 
-    /* default style to apply to uncomplete segmeents styles */
+    /* default style to apply to incomplete segments styles */
     p_sys->p_default_style = text_style_Create( STYLE_FULLY_SET );
     if(unlikely(!p_sys->p_default_style))
         goto error;

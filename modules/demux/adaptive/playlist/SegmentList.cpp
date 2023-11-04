@@ -31,14 +31,16 @@
 #include "SegmentTimeline.h"
 
 #include <limits>
+#include <cassert>
 
 using namespace adaptive;
 using namespace adaptive::playlist;
 
-SegmentList::SegmentList( SegmentInformation *parent_ ):
+SegmentList::SegmentList( SegmentInformation *parent_, bool b_relative ):
     AbstractMultipleSegmentBaseType( parent_, AttrsNode::Type::SegmentList )
 {
     totalLength = 0;
+    b_relative_mediatimes = b_relative;
 }
 SegmentList::~SegmentList()
 {
@@ -89,44 +91,60 @@ void SegmentList::addSegment(Segment *seg)
 void SegmentList::updateWith(AbstractMultipleSegmentBaseType *updated_,
                              bool b_restamp)
 {
+    stime_t duration = inheritDuration();
+
     AbstractMultipleSegmentBaseType::updateWith(updated_);
 
     SegmentList *updated = dynamic_cast<SegmentList *>(updated_);
     if(!updated || updated->segments.empty())
         return;
 
-    const Segment * lastSegment = (segments.empty()) ? nullptr : segments.back();
-    const Segment * prevSegment = lastSegment;
+    b_restamp = b_relative_mediatimes;
 
-    uint64_t firstnumber = updated->segments.front()->getSequenceNumber();
-
-    std::vector<Segment *>::iterator it;
-    for(it = updated->segments.begin(); it != updated->segments.end(); ++it)
+    if(!b_restamp || segments.empty())
     {
-        Segment *cur = *it;
-        if(!lastSegment || lastSegment->compare(cur) < 0)
-        {
-            if(b_restamp && prevSegment)
-            {
-                stime_t starttime = prevSegment->startTime.Get() + prevSegment->duration.Get();
-                if(starttime != cur->startTime.Get() && !cur->discontinuity)
-                {
-                    cur->startTime.Set(starttime);
-                }
+        if(!segments.empty())
+            pruneBySegmentNumber(std::numeric_limits<uint64_t>::max());
+        assert(segments.empty());
+        for(auto seg : updated->segments)
+            addSegment(seg);
+        updated->segments.clear();
+    }
+    else
+    {
+        const Segment * prevSegment = segments.back();
+        const uint64_t oldest = updated->segments.front()->getSequenceNumber();
 
-                prevSegment = cur;
+        /* filter out known segments from the update */
+        updated->pruneBySegmentNumber(prevSegment->getSequenceNumber() + 1);
+
+        if(updated->segments.empty())
+            return;
+
+        /* merge update with current list */
+        for(auto it = updated->segments.begin(); it != updated->segments.end(); ++it)
+        {
+            Segment *cur = *it;
+            cur->startTime.Set(prevSegment->startTime.Get() + prevSegment->duration.Get());
+            /* not continuous */
+            if(cur->getSequenceNumber() != prevSegment->getSequenceNumber() + 1)
+            {
+                assert(prevSegment->getSequenceNumber() < cur->getSequenceNumber());
+                assert(duration);
+                uint64_t gap = cur->getSequenceNumber() - prevSegment->getSequenceNumber() - 1;
+                cur->startTime.Set(cur->startTime.Get() + duration * gap);
             }
+            prevSegment = cur;
             addSegment(cur);
         }
-        else
-            delete cur;
-    }
-    updated->segments.clear();
+        updated->segments.clear();
 
-    pruneBySegmentNumber(firstnumber);
+        /* prune previous list using update window start */
+        pruneBySegmentNumber(oldest);
+    }
 }
 
-void SegmentList::pruneByPlaybackTime(mtime_t time)
+void SegmentList::pruneByPlaybackTime(vlc_tick_t time)
 {
     const Timescale timescale = inheritTimescale();
     uint64_t num = findSegmentNumberByScaledTime(segments, timescale.ToScaled(time));
@@ -151,7 +169,7 @@ void SegmentList::pruneBySegmentNumber(uint64_t tobelownum)
 }
 
 bool SegmentList::getPlaybackTimeDurationBySegmentNumber(uint64_t number,
-                                                         mtime_t *time, mtime_t *dur) const
+                                                         vlc_tick_t *time, vlc_tick_t *dur) const
 {
     if(number == std::numeric_limits<uint64_t>::max())
         return false;
@@ -219,7 +237,12 @@ stime_t SegmentList::getTotalLength() const
     return totalLength;
 }
 
-mtime_t SegmentList::getMinAheadTime(uint64_t curnum) const
+bool SegmentList::hasRelativeMediaTimes() const
+{
+    return b_relative_mediatimes;
+}
+
+vlc_tick_t SegmentList::getMinAheadTime(uint64_t curnum) const
 {
     const SegmentTimeline *timeline = inheritSegmentTimeline();
     if( timeline )
@@ -228,7 +251,7 @@ mtime_t SegmentList::getMinAheadTime(uint64_t curnum) const
         return timescale.ToTime(timeline->getMinAheadScaledTime(curnum));
     }
 
-    mtime_t minTime = 0;
+    vlc_tick_t minTime = 0;
     const Timescale timescale = inheritTimescale();
     std::vector<Segment *>::const_iterator it;
     for(it = segments.begin(); it != segments.end(); ++it)
@@ -277,7 +300,7 @@ uint64_t SegmentList::getStartSegmentNumber() const
     return !segments.empty() ? segments.front()->getSequenceNumber() : inheritStartNumber();
 }
 
-bool SegmentList::getSegmentNumberByTime(mtime_t time, uint64_t *ret) const
+bool SegmentList::getSegmentNumberByTime(vlc_tick_t time, uint64_t *ret) const
 {
     const SegmentTimeline *timeline = inheritSegmentTimeline();
     if(timeline)

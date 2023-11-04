@@ -107,18 +107,18 @@ struct aout_sys_t {
         jobject p_obj; /* AudioTimestamp ref */
         jlong i_frame_us;
         jlong i_frame_pos;
-        mtime_t i_play_time; /* time when play was called */
-        mtime_t i_last_time;
+        vlc_tick_t i_play_time; /* time when play was called */
+        vlc_tick_t i_last_time;
     } timestamp;
 
     /* Used by AudioTrack_GetSmoothPositionUs */
     struct {
         uint32_t i_idx;
         uint32_t i_count;
-        mtime_t p_us[SMOOTHPOS_SAMPLE_COUNT];
-        mtime_t i_us;
-        mtime_t i_last_time;
-        mtime_t i_latency_us;
+        vlc_tick_t p_us[SMOOTHPOS_SAMPLE_COUNT];
+        vlc_tick_t i_us;
+        vlc_tick_t i_last_time;
+        vlc_tick_t i_latency_us;
     } smoothpos;
 
     uint32_t i_max_audiotrack_samples;
@@ -650,7 +650,7 @@ AudioTrack_GetSmoothPositionUs( JNIEnv *env, audio_output_t *p_aout )
 {
     aout_sys_t *p_sys = p_aout->sys;
     uint64_t i_audiotrack_us;
-    mtime_t i_now = mdate();
+    vlc_tick_t i_now = mdate();
 
     /* Fetch an AudioTrack position every SMOOTHPOS_INTERVAL_US (30ms) */
     if( i_now - p_sys->smoothpos.i_last_time >= SMOOTHPOS_INTERVAL_US )
@@ -693,7 +693,7 @@ static mtime_t
 AudioTrack_GetTimestampPositionUs( JNIEnv *env, audio_output_t *p_aout )
 {
     aout_sys_t *p_sys = p_aout->sys;
-    mtime_t i_now;
+    vlc_tick_t i_now;
 
     if( !p_sys->timestamp.p_obj )
         return 0;
@@ -749,10 +749,10 @@ AudioTrack_GetTimestampPositionUs( JNIEnv *env, audio_output_t *p_aout )
 }
 
 static int
-TimeGet( audio_output_t *p_aout, mtime_t *restrict p_delay )
+TimeGet( audio_output_t *p_aout, vlc_tick_t *restrict p_delay )
 {
     aout_sys_t *p_sys = p_aout->sys;
-    mtime_t i_audiotrack_us;
+    vlc_tick_t i_audiotrack_us;
     JNIEnv *env;
 
     if( p_sys->b_passthrough )
@@ -771,9 +771,9 @@ TimeGet( audio_output_t *p_aout, mtime_t *restrict p_delay )
 /* Debug log for both delays */
 #if 0
 {
-    mtime_t i_written_us = FRAMES_TO_US( p_sys->i_samples_written );
-    mtime_t i_ts_us = AudioTrack_GetTimestampPositionUs( env, p_aout );
-    mtime_t i_smooth_us = 0;
+    vlc_tick_t i_written_us = FRAMES_TO_US( p_sys->i_samples_written );
+    vlc_tick_t i_ts_us = AudioTrack_GetTimestampPositionUs( env, p_aout );
+    vlc_tick_t i_smooth_us = 0;
 
     if( i_ts_us > 0 )
         i_smooth_us = AudioTrack_GetSmoothPositionUs(env, p_aout );
@@ -791,7 +791,7 @@ TimeGet( audio_output_t *p_aout, mtime_t *restrict p_delay )
     if( i_audiotrack_us > 0 )
     {
         /* AudioTrack delay */
-        mtime_t i_delay = FRAMES_TO_US( p_sys->i_samples_written )
+        vlc_tick_t i_delay = FRAMES_TO_US( p_sys->i_samples_written )
                         - i_audiotrack_us;
         if( i_delay >= 0 )
         {
@@ -1020,94 +1020,115 @@ AudioTrack_HasEncoding( audio_output_t *p_aout, vlc_fourcc_t i_format,
     }
 }
 
+static int GetPassthroughFmt( bool compat, audio_sample_format_t *fmt, bool b_dtshd, int *at_format )
+{
+    if( !compat && jfields.AudioFormat.has_ENCODING_IEC61937 )
+    {
+        *at_format = jfields.AudioFormat.ENCODING_IEC61937;
+        switch( fmt->i_format )
+        {
+            case VLC_CODEC_TRUEHD:
+            case VLC_CODEC_MLP:
+                fmt->i_rate = 192000;
+                fmt->i_bytes_per_frame = 16;
+
+                /* AudioFormat.ENCODING_IEC61937 documentation says that the
+                 * channel layout must be stereo. Well, not for TrueHD
+                 * apparently */
+                fmt->i_physical_channels = AOUT_CHANS_7_1;
+                break;
+            case VLC_CODEC_DTS:
+                fmt->i_bytes_per_frame = 4;
+                fmt->i_physical_channels = AOUT_CHANS_STEREO;
+                if( b_dtshd )
+                {
+                    fmt->i_rate = 192000;
+                    fmt->i_bytes_per_frame = 16;
+                }
+                break;
+            case VLC_CODEC_EAC3:
+                fmt->i_rate = 192000;
+            case VLC_CODEC_A52:
+                fmt->i_physical_channels = AOUT_CHANS_STEREO;
+                fmt->i_bytes_per_frame = 4;
+                break;
+            default:
+                return VLC_EGENERIC;
+        }
+        fmt->i_frame_length = 1;
+        fmt->i_channels = aout_FormatNbChannels( fmt );
+        fmt->i_format = VLC_CODEC_SPDIFL;
+    }
+    else
+    {
+        switch( fmt->i_format )
+        {
+            case VLC_CODEC_A52:
+                if( !jfields.AudioFormat.has_ENCODING_AC3 )
+                    return VLC_EGENERIC;
+                *at_format = jfields.AudioFormat.ENCODING_AC3;
+                break;
+            case VLC_CODEC_EAC3:
+                if( !jfields.AudioFormat.has_ENCODING_E_AC3 )
+                    return VLC_EGENERIC;
+                *at_format = jfields.AudioFormat.ENCODING_E_AC3;
+                break;
+            case VLC_CODEC_DTS:
+                if( !jfields.AudioFormat.has_ENCODING_DTS )
+                    return VLC_EGENERIC;
+                *at_format = jfields.AudioFormat.ENCODING_DTS;
+                break;
+            default:
+                return VLC_EGENERIC;
+        }
+        fmt->i_bytes_per_frame = 4;
+        fmt->i_frame_length = 1;
+        fmt->i_physical_channels = AOUT_CHANS_STEREO;
+        fmt->i_channels = 2;
+        fmt->i_format = VLC_CODEC_SPDIFB;
+    }
+
+    return VLC_SUCCESS;
+}
+
 static int
 StartPassthrough( JNIEnv *env, audio_output_t *p_aout )
 {
     aout_sys_t *p_sys = p_aout->sys;
-    int i_at_format;
 
     bool b_dtshd;
     if( !AudioTrack_HasEncoding( p_aout, p_sys->fmt.i_format, &b_dtshd ) )
         return VLC_EGENERIC;
 
-    if( jfields.AudioFormat.has_ENCODING_IEC61937 )
+    /* Try ENCODING_IEC61937 first, then fallback to ENCODING_[AC3|DTS|...] */
+    unsigned nb_fmt = jfields.AudioFormat.has_ENCODING_IEC61937 ? 2 : 1;
+    int i_ret;
+    for( unsigned i = 0; i < nb_fmt; ++i )
     {
-        i_at_format = jfields.AudioFormat.ENCODING_IEC61937;
-        switch( p_sys->fmt.i_format )
+        int i_at_format;
+        bool compat = i == 1;
+        audio_sample_format_t fmt = p_sys->fmt;
+
+        i_ret = GetPassthroughFmt( compat, &fmt, b_dtshd, &i_at_format );
+        if( i_ret != VLC_SUCCESS )
+            return i_ret;
+
+        p_sys->b_passthrough = true;
+        i_ret = AudioTrack_Create( env, p_aout, fmt.i_rate, i_at_format,
+                                   fmt.i_physical_channels );
+
+        if( i_ret == VLC_SUCCESS )
         {
-            case VLC_CODEC_TRUEHD:
-            case VLC_CODEC_MLP:
-                p_sys->fmt.i_rate = 192000;
-                p_sys->fmt.i_bytes_per_frame = 16;
-
-                /* AudioFormat.ENCODING_IEC61937 documentation says that the
-                 * channel layout must be stereo. Well, not for TrueHD
-                 * apparently */
-                p_sys->fmt.i_physical_channels = AOUT_CHANS_7_1;
-                break;
-            case VLC_CODEC_DTS:
-                p_sys->fmt.i_bytes_per_frame = 4;
-                p_sys->fmt.i_physical_channels = AOUT_CHANS_STEREO;
-                if( b_dtshd )
-                {
-                    p_sys->fmt.i_rate = 192000;
-                    p_sys->fmt.i_bytes_per_frame = 16;
-                }
-                break;
-            case VLC_CODEC_EAC3:
-                p_sys->fmt.i_rate = 192000;
-            case VLC_CODEC_A52:
-                p_sys->fmt.i_physical_channels = AOUT_CHANS_STEREO;
-                p_sys->fmt.i_bytes_per_frame = 4;
-                break;
-            default:
-                return VLC_EGENERIC;
+            msg_Dbg( p_aout, "Using passthrough format: %d", i_at_format );
+            p_sys->i_chans_to_reorder = 0;
+            p_sys->fmt = fmt;
+            return VLC_SUCCESS;
         }
-        p_sys->fmt.i_frame_length = 1;
-        p_sys->fmt.i_channels = aout_FormatNbChannels( &p_sys->fmt );
-        p_sys->fmt.i_format = VLC_CODEC_SPDIFL;
-    }
-    else
-    {
-        switch( p_sys->fmt.i_format )
-        {
-            case VLC_CODEC_A52:
-                if( !jfields.AudioFormat.has_ENCODING_AC3 )
-                    return VLC_EGENERIC;
-                i_at_format = jfields.AudioFormat.ENCODING_AC3;
-                break;
-            case VLC_CODEC_EAC3:
-                if( !jfields.AudioFormat.has_ENCODING_E_AC3 )
-                    return VLC_EGENERIC;
-                i_at_format = jfields.AudioFormat.ENCODING_E_AC3;
-                break;
-            case VLC_CODEC_DTS:
-                if( !jfields.AudioFormat.has_ENCODING_DTS )
-                    return VLC_EGENERIC;
-                i_at_format = jfields.AudioFormat.ENCODING_DTS;
-                break;
-            default:
-                return VLC_EGENERIC;
-        }
-        p_sys->fmt.i_bytes_per_frame = 4;
-        p_sys->fmt.i_frame_length = 1;
-        p_sys->fmt.i_physical_channels = AOUT_CHANS_STEREO;
-        p_sys->fmt.i_channels = 2;
-        p_sys->fmt.i_format = VLC_CODEC_SPDIFB;
     }
 
-    p_sys->b_passthrough = true;
-    int i_ret = AudioTrack_Create( env, p_aout, p_sys->fmt.i_rate, i_at_format,
-                                   p_sys->fmt.i_physical_channels );
-    if( i_ret != VLC_SUCCESS )
-    {
-        p_sys->b_passthrough = false;
-        msg_Warn( p_aout, "SPDIF configuration failed" );
-    }
-    else
-        p_sys->i_chans_to_reorder = 0;
-
-    return i_ret;
+    p_sys->b_passthrough = false;
+    msg_Warn( p_aout, "SPDIF configuration failed" );
+    return VLC_EGENERIC;
 }
 
 static int
@@ -1711,8 +1732,8 @@ AudioTrack_Thread( void *p_data )
     audio_output_t *p_aout = p_data;
     aout_sys_t *p_sys = p_aout->sys;
     JNIEnv *env = GET_ENV();
-    mtime_t i_play_deadline = 0;
-    mtime_t i_last_time_blocked = 0;
+    vlc_tick_t i_play_deadline = 0;
+    vlc_tick_t i_last_time_blocked = 0;
 
     if( !env )
         return NULL;
@@ -1943,7 +1964,7 @@ bailout:
 }
 
 static void
-Pause( audio_output_t *p_aout, bool b_pause, mtime_t i_date )
+Pause( audio_output_t *p_aout, bool b_pause, vlc_tick_t i_date )
 {
     aout_sys_t *p_sys = p_aout->sys;
     JNIEnv *env;

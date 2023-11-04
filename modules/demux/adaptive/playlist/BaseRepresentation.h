@@ -63,14 +63,14 @@ namespace adaptive
                 const std::list<std::string> & getCodecs    () const;
                 void                addCodecs               (const std::string &);
                 void                getCodecsDesc           (CodecDescriptionList *) const;
-                bool                consistentSegmentNumber () const;
-                virtual void        pruneByPlaybackTime     (mtime_t) override;
+                virtual void        pruneByPlaybackTime     (vlc_tick_t) override;
 
-                virtual mtime_t     getMinAheadTime         (uint64_t) const;
+                virtual vlc_tick_t  getMinAheadTime         (uint64_t) const;
                 virtual bool        needsUpdate             (uint64_t) const;
                 virtual bool        needsIndex              () const;
                 virtual bool        runLocalUpdates         (SharedResources *);
                 virtual void        scheduleNextUpdate      (uint64_t, bool);
+                virtual bool        canNoLongerUpdate       () const;
 
                 virtual void        debug                   (vlc_object_t *,int = 0) const;
 
@@ -83,17 +83,16 @@ namespace adaptive
 
                 virtual uint64_t translateSegmentNumber(uint64_t, const BaseRepresentation *) const;
                 bool getSegmentNumberByTime(mtime_t, uint64_t *) const;
-                bool getPlaybackTimeDurationBySegmentNumber(uint64_t, mtime_t *, mtime_t *) const;
-                bool getMediaPlaybackRange(mtime_t *rangeBegin,
-                                                               mtime_t *rangeEnd,
-                                                               mtime_t *rangeLength) const;
+                bool getPlaybackTimeDurationBySegmentNumber(uint64_t, vlc_tick_t *, vlc_tick_t *) const;
+                bool getMediaPlaybackRange(vlc_tick_t *rangeBegin,
+                                                               vlc_tick_t *rangeEnd,
+                                                               vlc_tick_t *rangeLength) const;
             protected:
                 virtual CodecDescription * makeCodecDescription(const std::string &) const;
                 virtual bool        validateCodec(const std::string &) const;
                 BaseAdaptationSet                  *adaptationSet;
                 uint64_t                            bandwidth;
                 std::list<std::string>              codecs;
-                bool                                b_consistent;
         };
     }
 }

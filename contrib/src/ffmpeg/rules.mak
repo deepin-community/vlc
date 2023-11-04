@@ -5,8 +5,12 @@
 #USE_FFMPEG ?= 1
 
 ifndef USE_LIBAV
-FFMPEG_HASH=dc91b913b6260e85e1304c74ff7bb3c22a8c9fb1
-FFMPEG_BRANCH=release/4.4
+FFMPEG_HASH=ec47a3b95f88fc3f820b900038ac439e4eb3fede
+FFMPEG_MAJVERSION := 4.4
+FFMPEG_REVISION := 3
+FFMPEG_VERSION := $(FFMPEG_MAJVERSION).$(FFMPEG_REVISION)
+FFMPEG_BRANCH=release/$(FFMPEG_MAJVERSION)
+FFMPEG_URL := https://ffmpeg.org/releases/ffmpeg-$(FFMPEG_VERSION).tar.xz
 FFMPEG_SNAPURL := http://git.videolan.org/?p=ffmpeg.git;a=snapshot;h=$(FFMPEG_HASH);sf=tgz
 FFMPEG_GITURL := http://git.videolan.org/git/ffmpeg.git
 FFMPEG_LAVC_MIN := 57.37.100
@@ -122,6 +126,11 @@ ifeq ($(ARCH),mips64el)
 FFMPEGCONF += --arch=mips64
 endif
 
+# RISC-V stuff
+ifneq ($(findstring $(ARCH),riscv32 riscv64),)
+FFMPEGCONF += --arch=riscv
+endif
+
 # x86 stuff
 ifeq ($(ARCH),i386)
 ifndef HAVE_DARWIN_OS
@@ -220,14 +229,19 @@ FFMPEGCONF += --nm="$(NM)" --ar="$(AR)" --ranlib="$(RANLIB)"
 $(TARBALLS)/ffmpeg-$(FFMPEG_BASENAME).tar.xz:
 	$(call download_git,$(FFMPEG_GITURL),$(FFMPEG_BRANCH),$(FFMPEG_HASH))
 
-.sum-ffmpeg: $(TARBALLS)/ffmpeg-$(FFMPEG_BASENAME).tar.xz
-	$(call check_githash,$(FFMPEG_HASH))
-	touch $@
+# .sum-ffmpeg: $(TARBALLS)/ffmpeg-$(FFMPEG_BASENAME).tar.xz
+# 	$(call check_githash,$(FFMPEG_HASH))
+# 	touch $@
 
-ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
-	rm -Rf $@ $@-$(FFMPEG_BASENAME)
-	mkdir -p $@-$(FFMPEG_BASENAME)
-	tar xvJfo "$<" --strip-components=1 -C $@-$(FFMPEG_BASENAME)
+$(TARBALLS)/ffmpeg-$(FFMPEG_VERSION).tar.xz:
+	$(call download_pkg,$(FFMPEG_URL),ffmpeg)
+
+.sum-ffmpeg: ffmpeg-$(FFMPEG_VERSION).tar.xz
+
+ffmpeg: ffmpeg-$(FFMPEG_VERSION).tar.xz .sum-ffmpeg
+	rm -Rf $@ $@-$(FFMPEG_VERSION)
+	mkdir -p $@-$(FFMPEG_VERSION)
+	tar xvJfo "$<" --strip-components=1 -C $@-$(FFMPEG_VERSION)
 ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/armv7_fixup.patch
 	$(APPLY) $(SRC)/ffmpeg/dxva_vc1_crash.patch
@@ -240,6 +254,7 @@ ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/0001-fix-MediaFoundation-compilation-if-WINVER-was-forced.patch
 	$(APPLY) $(SRC)/ffmpeg/0001-bring-back-XP-support.patch
 	$(APPLY) $(SRC)/ffmpeg/0001-avcodec-vp9-Do-not-destroy-uninitialized-mutexes-con.patch
+	$(APPLY) $(SRC)/ffmpeg/0001-dxva2_hevc-don-t-use-frames-as-reference-if-they-are.patch
 endif
 ifdef USE_LIBAV
 	$(APPLY) $(SRC)/ffmpeg/libav_gsm.patch

@@ -2,7 +2,7 @@
  * ntservice.c: Windows NT/2K/XP service interface
  *****************************************************************************
  * Copyright (C) 2004 the VideoLAN team
- * $Id: 7b20bd579746db75899234016c5de1d2308c6f16 $
+ * $Id: c304e056bfde61b6bf353ab88f7e64a48bdfeb8d $
  *
  * Authors: Gildas Bazin <gbazin@videolan.org>
  *
@@ -142,7 +142,7 @@ static void *Run( void *data )
     intf_thread_t *p_intf = data;
     SERVICE_TABLE_ENTRY dispatchTable[] =
     {
-        { TEXT(VLCSERVICENAME), &ServiceDispatch },
+        { (WCHAR*) TEXT(VLCSERVICENAME), (LPSERVICE_MAIN_FUNCTION) &ServiceDispatch },
         { NULL, NULL }
     };
 
@@ -251,7 +251,7 @@ static int NTServiceInstall( intf_thread_t *p_intf )
     }
     else
     {
-        msg_Warn( p_intf, "service successfuly created" );
+        msg_Warn( p_intf, "service successfully created" );
     }
 
     free( path_stream.ptr );
@@ -291,7 +291,7 @@ static int NTServiceUninstall( intf_thread_t *p_intf )
     }
     else
     {
-        msg_Dbg( p_intf, "service deleted successfuly" );
+        msg_Dbg( p_intf, "service deleted successfully" );
     }
 
     CloseServiceHandle( service );

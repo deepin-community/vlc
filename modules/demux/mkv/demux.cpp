@@ -3,7 +3,7 @@
  * mkv.cpp : matroska demuxer
  *****************************************************************************
  * Copyright (C) 2003-2004 VLC authors and VideoLAN
- * $Id: 6fa2418dd2b8f0544ec0b00fe54b71fcbc03ac11 $
+ * $Id: 154deb00528efef889bba8c5ddb0dcfbd7dc5859 $
  *
  * Authors: Laurent Aimar <fenrir@via.ecp.fr>
  *          Steve Lhomme <steve.lhomme@free.fr>
@@ -483,9 +483,9 @@ bool demux_sys_t::AnalyseAllSegmentsFound( demux_t *p_demux, matroska_stream_c *
     }
 
     EDocTypeReadVersion doc_read_version = GetChild<EDocTypeReadVersion>(*static_cast<EbmlHead*>(p_l0));
-    if (uint64(doc_read_version) > 2)
+    if (uint64(doc_read_version) > 5)
     {
-        msg_Err( p_demux, "matroska file needs version %" PRId64 " but only versions 1 & 2 supported", uint64(doc_read_version));
+        msg_Err( p_demux, "matroska file needs version %" PRId64 " but only versions 1 to 4 supported", uint64(doc_read_version));
         return false;
     }
 
@@ -720,7 +720,7 @@ bool demux_sys_t::FreeUnused()
     return !streams.empty() && !opened_segments.empty();
 }
 
-bool demux_sys_t::PreparePlayback( virtual_segment_c & new_vsegment, mtime_t i_mk_date )
+bool demux_sys_t::PreparePlayback( virtual_segment_c & new_vsegment, vlc_tick_t i_mk_date )
 {
     if ( p_current_vsegment != &new_vsegment )
     {

@@ -1,12 +1,12 @@
 dnl Autoconf settings for vlc
 
-AC_COPYRIGHT([Copyright 1999-2022 VLC authors and VideoLAN])
+AC_COPYRIGHT([Copyright 1999-2023 VLC authors and VideoLAN])
 
-AC_INIT(vlc, 3.0.17.4)
+AC_INIT(vlc, 3.0.20)
 VERSION_MAJOR=3
 VERSION_MINOR=0
-VERSION_REVISION=17
-VERSION_EXTRA=4
+VERSION_REVISION=20
+VERSION_EXTRA=0
 VERSION_DEV=
 
 PKGDIR="vlc"
@@ -14,7 +14,7 @@ AC_SUBST(PKGDIR)
 
 CONFIGURE_LINE="`echo "$0 $ac_configure_args" | sed -e 's/\\\/\\\\\\\/g'`"
 CODENAME="Vetinari"
-COPYRIGHT_YEARS="1996-2022"
+COPYRIGHT_YEARS="1996-2023"
 
 AC_CONFIG_SRCDIR(src/libvlc.c)
 AC_CONFIG_AUX_DIR(autotools)
@@ -65,7 +65,7 @@ AC_PROG_EGREP
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AM_PROG_AS
-AC_PROG_LEX
+AC_PROG_LEX([noyywrap])
 AC_PROG_YACC
 
 AC_ARG_VAR([DESKTOP_FILE_VALIDATE], [Validator for desktop entry files])
@@ -711,15 +711,14 @@ dnl Check for struct sockaddr_storage
 AH_TEMPLATE(sockaddr_storage, [Define to `sockaddr' if <sys/socket.h> does not define.]) dnl ` (fix VIM syntax highlight
 AH_TEMPLATE(ss_family, [Define to `sa_family' if <sys/socket.h> does not define.]) dnl ` (fix VIM syntax highlight
 AC_CACHE_CHECK([for struct sockaddr_storage], ac_cv_struct_sockaddr_storage,
-  [AC_TRY_COMPILE(
-    [#include <sys/types.h>
+  [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
      #if defined( _WIN32 )
      # include <winsock2.h>
      #else
      # include <sys/socket.h>
-     #endif], [struct sockaddr_storage addr;],
-     ac_cv_struct_sockaddr_storage=yes,
-     ac_cv_struct_sockaddr_storage=no)])
+     #endif]], [[struct sockaddr_storage addr;]])],
+     [ac_cv_struct_sockaddr_storage=yes],
+     [ac_cv_struct_sockaddr_storage=no])])
 AS_IF([test "${ac_cv_struct_sockaddr_storage}" = no], [
   AC_DEFINE(sockaddr_storage, sockaddr)
   AC_DEFINE(ss_family, sa_family)
@@ -861,8 +860,8 @@ AC_LANG_PUSH(C++)
 AC_CACHE_CHECK([if C++ headers define locale_t],
   [ac_cv_cxx_locale_t],
   [ac_cv_cxx_locale_t=no
-   AC_TRY_COMPILE([#include <locale>], [locale_t loc;],
-                    [ac_cv_cxx_locale_t=yes])])
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <locale>]], [[locale_t loc;]])],
+                        [ac_cv_cxx_locale_t=yes],[])])
 if test "${ac_cv_cxx_locale_t}" != "no"; then
   AC_DEFINE(HAVE_CXX_LOCALE_T, 1, Define to 1 if C++ headers define locale_t)
 fi
@@ -1198,7 +1197,7 @@ AH_BOTTOM([
 VLC_SAVE_FLAGS
 LDFLAGS="${LDFLAGS} -Wl,-Bsymbolic"
 AC_CACHE_CHECK([if linker supports -Bsymbolic], [ac_cv_ld_bsymbolic], [
-  AC_TRY_LINK([],, [
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[]])],[
     ac_cv_ld_bsymbolic="-Wl,-Bsymbolic"
   ], [
     ac_cv_ld_bsymbolic=""
@@ -1211,7 +1210,7 @@ AC_SUBST(SYMBOLIC_LDFLAGS)
 VLC_SAVE_FLAGS
 LDFLAGS="${LDFLAGS} -Wl,-z,defs"
 AC_CACHE_CHECK([if linker supports -z,defs], [ac_cv_ld_z_defs], [
-  AC_TRY_LINK([],, [
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[]])],[
     ac_cv_ld_z_defs="yes"
   ], [
     ac_cv_ld_z_defs="no"
@@ -1223,8 +1222,9 @@ dnl Check for __attribute__((packed))
 AC_CACHE_CHECK([for __attribute__((packed))],
   [ac_cv_c_attribute_packed],
   [ac_cv_c_attribute_packed=no
-   AC_TRY_COMPILE(, [struct __attribute__((__packed__)) foo { int a; } b; (void)b;],
-                    [ac_cv_c_attribute_packed=yes])])
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
+                        [[struct __attribute__((__packed__)) foo { int a; } b; (void)b;]])],
+                     [ac_cv_c_attribute_packed=yes],[])])
 if test "${ac_cv_c_attribute_packed}" != "no"; then
   AC_DEFINE(HAVE_ATTRIBUTE_PACKED, 1, Support for __attribute__((packed)) for structs)
 fi
@@ -1578,16 +1578,19 @@ AC_ARG_ENABLE(altivec,
         [enable_altivec=yes], [enable_altivec=no])
 ])
 have_altivec="no"
-ALTIVEC_CFLAGS=""
 AS_IF([test "${enable_altivec}" = "yes"], [
   ARCH="${ARCH} altivec";
   VLC_SAVE_FLAGS
   AC_CACHE_CHECK([if $CC groks AltiVec inline assembly],
     [ac_cv_altivec_inline],
-    [AC_TRY_COMPILE(,[asm volatile("vperm 0,1,2,3");],
-         ac_cv_altivec_inline="yes",
-         [CFLAGS="${CFLAGS} -Wa,-maltivec"
-          AC_TRY_COMPILE(,[asm volatile("vperm 0,1,2,3");],
+    [AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[]],
+            [[asm volatile("vperm 0,1,2,3");]])],
+     [ac_cv_altivec_inline="yes"],
+     [CFLAGS="${CFLAGS} -Wa,-maltivec"
+      AC_COMPILE_IFELSE([
+         AC_LANG_PROGRAM([[]],
+            [[asm volatile("vperm 0,1,2,3");]])],
             [ac_cv_altivec_inline="-Wa,-maltivec"],
             ac_cv_altivec_inline=no)
          ])])
@@ -1595,11 +1598,6 @@ AS_IF([test "${enable_altivec}" = "yes"], [
   AS_IF([test "${ac_cv_altivec_inline}" != "no"], [
     AC_DEFINE(CAN_COMPILE_ALTIVEC, 1,
               [Define to 1 if AltiVec inline assembly is available.])
-    AS_IF([test "${ac_cv_altivec_inline}" != "yes"], [
-      ALTIVEC_CFLAGS="${ac_cv_altivec_inline}"
-      VLC_ADD_CFLAGS([libvlccore],[${ac_cv_altivec_inline}])
-    ])
-    have_altivec="yes"
   ])
 
   VLC_SAVE_FLAGS
@@ -1616,11 +1614,6 @@ AS_IF([test "${enable_altivec}" = "yes"], [
   ])
   VLC_RESTORE_FLAGS
   AS_IF([test "${ac_cv_c_altivec}" != "no"], [
-    CPPFLAGS="${CPPFLAGS} ${ac_cv_c_altivec}"
-    AC_DEFINE(CAN_COMPILE_C_ALTIVEC, 1, [Define to 1 if C AltiVec extensions are available.])
-    VLC_ADD_CFLAGS([libvlccore],[${ac_cv_c_altivec}])
-    ALTIVEC_CFLAGS="$ALTIVEC_CFLAGS ${ac_cv_c_altivec}"
-    VLC_ADD_CFLAGS([deinterlace],[${ac_cv_c_altivec}])
     have_altivec="yes"
   ])
   AC_CHECK_HEADERS(altivec.h)
@@ -1629,13 +1622,12 @@ AS_IF([test "${enable_altivec}" = "yes"], [
   LDFLAGS="${LDFLAGS} -Wl,-framework,vecLib"
   AC_CACHE_CHECK([if linker needs -framework vecLib],
     [ac_cv_ld_altivec],
-    [AC_TRY_LINK([],,ac_cv_ld_altivec=yes,ac_cv_ld_altivec=no)])
+    [AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[]])],[ac_cv_ld_altivec=yes],[ac_cv_ld_altivec=no])])
   VLC_RESTORE_FLAGS
   AS_IF([test "${ac_cv_ld_altivec}" != "no"], [
     VLC_ADD_LIBS([libvlccore],[-Wl,-framework,vecLib])
   ])
 ])
-AC_SUBST(ALTIVEC_CFLAGS)
 AM_CONDITIONAL([HAVE_ALTIVEC], [test "$have_altivec" = "yes"])
 
 dnl
@@ -1880,7 +1872,7 @@ PKG_ENABLE_MODULES_VLC([DVDREAD], [], [dvdread > 4.9.0], [dvdread input module],
 dnl
 dnl libdvdnav plugin
 dnl
-PKG_ENABLE_MODULES_VLC([DVDNAV], [], [dvdnav > 5.0.3], [DVD with navigation input module (dvdnav)], [auto])
+PKG_ENABLE_MODULES_VLC([DVDNAV], [], [dvdnav > 4.9.0], [DVD with navigation input module (dvdnav)], [auto])
 AS_IF([test "${enable_dvdnav}" != "no"], [
   AC_MSG_CHECKING(for dvdnav_stream_cb in dvdnav/dvdnav.h)
     AC_EGREP_HEADER(dvdnav_stream_cb,dvdnav/dvdnav.h,[
@@ -2128,26 +2120,7 @@ AM_CONDITIONAL(HAVE_DVBPSI, [test "${have_dvbpsi}" = "yes"])
 dnl
 dnl  GME demux plugin
 dnl
-AC_ARG_ENABLE(gme,
-  [AS_HELP_STRING([--enable-gme],
-    [use Game Music Emu (default auto)])])
-AS_IF([test "${enable_gme}" != "no"], [
-  AC_CHECK_HEADER([gme/gme.h], [
-    AC_CHECK_LIB([gme], [gme_identify_header], [
-      VLC_ADD_PLUGIN([gme])
-    ], [
-      AC_CHECK_LIB([gme], [gme_identify_extension], [
-         VLC_ADD_LIBS([gme], [-lstdc++ $LIBM])
-         VLC_ADD_PLUGIN([gme])
-      ],, [-lstdc++ $LIBM])
-    ])
-    VLC_ADD_LIBS([gme], [-lgme])
-  ], [
-    AS_IF([test "x${enable_gme}" != "x"], [
-      AC_MSG_ERROR([GME cannot be found. Please install the development files.])
-    ])
-  ])
-])
+PKG_ENABLE_MODULES_VLC([GME], [], [libgme], [Game Music Emu support (default auto)], [auto])
 
 
 dnl
@@ -3600,8 +3573,12 @@ AC_ARG_ENABLE([sndio],
 ])
 have_sndio="no"
 AS_IF([test "$enable_sndio" != "no"], [
-  AC_CHECK_HEADER([sndio.h], [
+  PKG_CHECK_MODULES([SNDIO], [sndio], [
     have_sndio="yes"
+  ], [
+    AS_IF([test -n "$enable_sndio"], [
+      AC_MSG_ERROR([${SNDIO_PKG_ERRORS}.)])
+    ])
   ])
 ])
 AM_CONDITIONAL([HAVE_SNDIO], [test "${have_sndio}" = "yes"])

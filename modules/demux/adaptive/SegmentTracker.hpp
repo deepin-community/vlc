@@ -21,6 +21,7 @@
 #define SEGMENTTRACKER_HPP
 
 #include "StreamFormat.hpp"
+#include "Time.hpp"
 #include "playlist/CodecDescription.hpp"
 #include "playlist/Role.hpp"
 
@@ -61,7 +62,10 @@ namespace adaptive
             enum class Type
             {
                 Discontinuity,
+                SegmentGap,
                 RepresentationSwitch,
+                RepresentationUpdated,
+                RepresentationUpdateFailed,
                 FormatChange,
                 SegmentChange,
                 BufferingStateUpdate,
@@ -82,8 +86,17 @@ namespace adaptive
     class DiscontinuityEvent : public TrackerEvent
     {
         public:
-            DiscontinuityEvent();
+            DiscontinuityEvent(uint64_t);
             virtual ~DiscontinuityEvent()  = default;
+
+            uint64_t discontinuitySequenceNumber;
+    };
+
+    class SegmentGapEvent : public TrackerEvent
+    {
+        public:
+            SegmentGapEvent();
+            virtual ~SegmentGapEvent()  = default;
     };
 
     class RepresentationSwitchEvent : public TrackerEvent
@@ -95,6 +108,24 @@ namespace adaptive
 
             BaseRepresentation *prev;
             BaseRepresentation *next;
+    };
+
+    class RepresentationUpdatedEvent : public TrackerEvent
+    {
+        public:
+            RepresentationUpdatedEvent(BaseRepresentation *);
+            virtual ~RepresentationUpdatedEvent() = default;
+
+            BaseRepresentation *rep;
+    };
+
+    class RepresentationUpdateFailedEvent : public TrackerEvent
+    {
+        public:
+            RepresentationUpdateFailedEvent(BaseRepresentation *);
+            virtual ~RepresentationUpdateFailedEvent() = default;
+
+            BaseRepresentation *rep;
     };
 
     class FormatChangedEvent : public TrackerEvent
@@ -111,13 +142,15 @@ namespace adaptive
     {
         public:
             SegmentChangedEvent() = delete;
-            SegmentChangedEvent(const ID &, mtime_t, mtime_t, mtime_t = VLC_TS_INVALID);
+            SegmentChangedEvent(const ID &, uint64_t,
+                                mtime_t, mtime_t, vlc_tick_t = VLC_TICK_INVALID);
             virtual ~SegmentChangedEvent() = default;
 
             const ID *id;
-            mtime_t displaytime;
-            mtime_t starttime;
-            mtime_t duration;
+            uint64_t sequence;
+            vlc_tick_t displaytime;
+            vlc_tick_t starttime;
+            vlc_tick_t duration;
     };
 
     class BufferingStateUpdatedEvent : public TrackerEvent
@@ -140,17 +173,19 @@ namespace adaptive
             virtual ~BufferingLevelChangedEvent() = default;
 
             const ID *id;
-            mtime_t minimum;
-            mtime_t maximum;
-            mtime_t current;
-            mtime_t target;
+            vlc_tick_t minimum;
+            vlc_tick_t maximum;
+            vlc_tick_t current;
+            vlc_tick_t target;
     };
 
     class PositionChangedEvent : public TrackerEvent
     {
         public:
-            PositionChangedEvent();
+            PositionChangedEvent(vlc_tick_t);
             virtual ~PositionChangedEvent() = default;
+
+            vlc_tick_t resumeTime;
     };
 
     class SegmentTrackerListenerInterface
@@ -166,7 +201,8 @@ namespace adaptive
             SegmentTracker(SharedResources *,
                            AbstractAdaptationLogic *,
                            const AbstractBufferingLogic *,
-                           BaseAdaptationSet *);
+                           BaseAdaptationSet *,
+                           SynchronizationReferences *);
             ~SegmentTracker();
 
             class Position
@@ -183,22 +219,23 @@ namespace adaptive
                     bool index_sent;
             };
 
-            StreamFormat getCurrentFormat() const;
             void getCodecsDesc(CodecDescriptionList *) const;
             const Role & getStreamRole() const;
             void reset();
-            ChunkInterface* getNextChunk(bool, AbstractConnectionManager *);
+            ChunkInterface* getNextChunk(bool);
             bool setPositionByTime(mtime_t, bool, bool);
             void setPosition(const Position &, bool);
             bool setStartPosition();
             Position getStartPosition() const;
-            mtime_t getPlaybackTime(bool = false) const; /* Current segment start time if selected */
-            bool getMediaPlaybackRange(mtime_t *, mtime_t *, mtime_t *) const;
-            mtime_t getMinAheadTime() const;
+            vlc_tick_t getPlaybackTime(bool = false) const; /* Current segment start time if selected */
+            bool getMediaPlaybackRange(vlc_tick_t *, vlc_tick_t *, vlc_tick_t *) const;
+            vlc_tick_t getMinAheadTime() const;
+            bool getSynchronizationReference(uint64_t, mtime_t, SynchronizationReference &) const;
+            void updateSynchronizationReference(uint64_t, const Times &);
             void notifyBufferingState(bool) const;
             void notifyBufferingLevel(mtime_t, mtime_t, mtime_t, mtime_t) const;
             void registerListener(SegmentTrackerListenerInterface *);
-            void updateSelected();
+            bool updateSelected();
             bool bufferingAvailable() const;
 
         private:
@@ -206,17 +243,16 @@ namespace adaptive
             {
                 public:
                     ChunkEntry();
-                    ChunkEntry(SegmentChunk *c, Position p, mtime_t s, mtime_t d, mtime_t dt);
+                    ChunkEntry(SegmentChunk *c, Position p, vlc_tick_t s, vlc_tick_t d, vlc_tick_t dt);
                     bool isValid() const;
                     SegmentChunk *chunk;
                     Position pos;
-                    mtime_t displaytime;
-                    mtime_t starttime;
-                    mtime_t duration;
+                    vlc_tick_t displaytime;
+                    vlc_tick_t starttime;
+                    vlc_tick_t duration;
             };
             std::list<ChunkEntry> chunkssequence;
-            ChunkEntry prepareChunk(bool switch_allowed, Position pos,
-                                    AbstractConnectionManager *connManager) const;
+            ChunkEntry prepareChunk(bool switch_allowed, Position pos) const;
             void resetChunksSequence();
             void setAdaptationLogic(AbstractAdaptationLogic *);
             void notify(const TrackerEvent &) const;
@@ -226,6 +262,7 @@ namespace adaptive
             Position next;
             StreamFormat format;
             SharedResources *resources;
+            SynchronizationReferences *synchronizationReferences;
             AbstractAdaptationLogic *logic;
             const AbstractBufferingLogic *bufferingLogic;
             BaseAdaptationSet *adaptationSet;

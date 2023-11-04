@@ -1,16 +1,59 @@
-vlc (3.0.17.4-5deepin) unstable; urgency=medium
+vlc (3.0.20-1) unstable; urgency=medium
 
-  * debian/rules:
-    - Disable libva support
-      Deepin currently doesn't have ffmpeg 5.0.
+  * New upstream version 3.0.20.
 
- -- Tianyu Chen <chentianyu1@uniontech.com>  Fri, 17 Mar 2023 16:19:37 +0800
+ -- Mateusz Łukasik <mati75@linuxmint.pl>  Wed, 01 Nov 2023 20:58:55 +0100
+
+vlc (3.0.19-1) unstable; urgency=medium
+
+  * New upstream version 3.0.19
+  * debian/patches: Drop patches from upstream
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Sat, 14 Oct 2023 19:52:05 +0200
+
+vlc (3.0.18-4) unstable; urgency=medium
+
+  [ Pino Toscano ]
+  * d/vlc-plugin-base.install: drop non-existing files
+  * d/rules: drop "libva" from "removeplugins" for all the archs
+  * d/vlc-plugin-video-output: mark vaapi plugins as "libva"
+
+  [ Sebastian Ramacher ]
+  * debian/: Disable libplacebo. libplacebo 6 is too new for vlc.
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Mon, 31 Jul 2023 23:47:01 +0200
+
+vlc (3.0.18-3) unstable; urgency=medium
+
+  * debian/control: Bump Standards-Version
+  * debian/: Disable SDL support (Closes: #1038590)
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Sat, 01 Jul 2023 19:24:56 +0200
+
+vlc (3.0.18-2) unstable; urgency=medium
+
+  * debian/patches: Apply upstream patch for flac playback issues
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Sun, 04 Dec 2022 22:11:55 +0100
+
+vlc (3.0.18-1) unstable; urgency=medium
+
+  * New upstream version 3.0.18
+
+ -- Mateusz Łukasik <mati75@linuxmint.pl>  Wed, 23 Nov 2022 19:50:35 +0100
+
+vlc (3.0.18~rc2-1) unstable; urgency=medium
+
+  * New upstream version 3.0.18~rc2
+  * debian/control: Remove patches included upstream
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Mon, 10 Oct 2022 08:44:18 +0200
 
 vlc (3.0.17.4-5) unstable; urgency=medium
 
   * debian/rules:
     - Revert "Disable libva support"
-    - Do not pass any libva flags (Closes: #1021032) (LP: #1991457)
+    - Do not pass any libva flags (Closes: #1021032) (LP: #1991418)
 
  -- Sebastian Ramacher <sramacher@debian.org>  Mon, 03 Oct 2022 22:07:16 +0200
 

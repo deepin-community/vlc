@@ -2,7 +2,7 @@
  * controller.cpp : Controller for the main interface
  ****************************************************************************
  * Copyright (C) 2006-2009 the VideoLAN team
- * $Id: 9e4011d43407f2f57ff37b18317dc69d13e191c8 $
+ * $Id$
  *
  * Authors: Jean-Baptiste Kempf <jb@videolan.org>
  *          Ilkka Ollakka <ileoo@videolan.org>
@@ -812,7 +812,7 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
 
     vout.clear();
 
-    setWindowFlags( Qt::Tool | Qt::FramelessWindowHint );
+    setWindowFlags( Qt::Tool | Qt::FramelessWindowHint | Qt::X11BypassWindowManagerHint );
     setAttribute( Qt::WA_ShowWithoutActivating );
     setMinimumWidth( FSC_WIDTH );
     isWideFSC = false;
@@ -858,10 +858,17 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     isWideFSC = getSettings()->value( "FullScreen/wide" ).toBool();
 
     CONNECT( this, fullscreenChanged( bool ), THEMIM, changeFullscreen( bool ) );
+
+    Q_ASSERT( _parent );
+    _parent->installEventFilter( this );
 }
 
 FullscreenControllerWidget::~FullscreenControllerWidget()
 {
+    QWidget *wParent = parentWidget();
+    Q_ASSERT( wParent );
+    wParent->removeEventFilter( this );
+
     getSettings()->setValue( "FullScreen/pos", previousPosition );
     getSettings()->setValue( "FullScreen/screen", screenRes );
     getSettings()->setValue( "FullScreen/wide", isWideFSC );
@@ -1074,6 +1081,21 @@ void FullscreenControllerWidget::customEvent( QEvent *event )
     }
 }
 
+bool FullscreenControllerWidget::eventFilter( QObject *watched, QEvent *event )
+{
+    const QWidget *wParent = parentWidget();
+    Q_ASSERT( wParent );
+
+    if ( watched == wParent && event->type() == QEvent::ActivationChange )
+    {
+        /* Hide if not active */
+        if ( !wParent->isActiveWindow() && !isActiveWindow() )
+            hideFSC();
+    }
+
+    return AbstractController::eventFilter( watched, event );
+}
+
 /**
  * On mouse move
  * moving with FSC
@@ -1088,7 +1110,12 @@ void FullscreenControllerWidget::mouseMoveEvent( QMouseEvent *event )
         int i_moveX = event->globalX() - i_mouse_last_x;
         int i_moveY = event->globalY() - i_mouse_last_y;
 
-        move( x() + i_moveX, y() + i_moveY );
+        const QRect screenRect = QApplication::desktop()->screenGeometry( targetScreen() );
+
+        const int i_x = qBound( screenRect.left(), x() + i_moveX, screenRect.right() - width() );
+        const int i_y = qBound( screenRect.top(),  y() + i_moveY, screenRect.bottom() - height() );
+
+        move( i_x, i_y );
 
         i_mouse_last_x = event->globalX();
         i_mouse_last_y = event->globalY();
@@ -1276,6 +1303,12 @@ void FullscreenControllerWidget::fullscreenChanged( vout_thread_t *p_vout,
  */
 void FullscreenControllerWidget::mouseChanged( vout_thread_t *, int i_mousex, int i_mousey )
 {
+    const QWidget *wParent = parentWidget();
+    Q_ASSERT( wParent );
+
+    /* Ignore mouse events if not active */
+    if ( !wParent->isActiveWindow() &&  !isActiveWindow() ) return;
+
     bool b_toShow;
 
     /* FIXME - multiple vout (ie multiple mouse position ?) and thread safety if multiple vout ? */
