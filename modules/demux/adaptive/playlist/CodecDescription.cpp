@@ -50,6 +50,14 @@ const es_format_t * CodecDescription::getFmt() const
     return &fmt;
 }
 
+void CodecDescription::setDimensions(unsigned w, unsigned h)
+{
+    if(fmt.i_cat != VIDEO_ES || !w || !h)
+        return;
+    fmt.video.i_visible_width = w;
+    fmt.video.i_visible_height = h;
+}
+
 void CodecDescription::setDescription(const std::string &d)
 {
     free(fmt.psz_description);
@@ -83,6 +91,11 @@ void CodecDescription::setSampleRate(const Rate &r)
     if(fmt.i_cat != AUDIO_ES || !r.isValid())
         return;
     fmt.audio.i_rate = r.num();
+}
+
+void CodecDescription::setChannelsCount(unsigned c)
+{
+    fmt.audio.i_channels = c;
 }
 
 CodecDescriptionList::CodecDescriptionList()

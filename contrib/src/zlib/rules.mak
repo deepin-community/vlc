@@ -1,6 +1,6 @@
 # ZLIB
-ZLIB_VERSION := 1.2.11
-ZLIB_URL := $(SF)/libpng/zlib-$(ZLIB_VERSION).tar.gz
+ZLIB_VERSION := 1.2.13
+ZLIB_URL := $(GITHUB)/madler/zlib/releases/download/v$(ZLIB_VERSION)/zlib-$(ZLIB_VERSION).tar.xz
 
 PKGS += zlib
 ifeq ($(call need_pkg,"zlib"),)
@@ -13,12 +13,12 @@ ZLIB_CONFIG_VARS=CHOST=$(HOST)
 endif
 endif
 
-$(TARBALLS)/zlib-$(ZLIB_VERSION).tar.gz:
+$(TARBALLS)/zlib-$(ZLIB_VERSION).tar.xz:
 	$(call download_pkg,$(ZLIB_URL),zlib)
 
-.sum-zlib: zlib-$(ZLIB_VERSION).tar.gz
+.sum-zlib: zlib-$(ZLIB_VERSION).tar.xz
 
-zlib: zlib-$(ZLIB_VERSION).tar.gz .sum-zlib
+zlib: zlib-$(ZLIB_VERSION).tar.xz .sum-zlib
 	$(UNPACK)
 	$(APPLY) $(SRC)/zlib/no-shared.patch
 	$(MOVE)

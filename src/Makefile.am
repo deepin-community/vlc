@@ -467,7 +467,7 @@ libvlccore_la_LDFLAGS = \
 	$(LDFLAGS_libvlccore) \
 	-no-undefined \
 	-export-symbols $(srcdir)/libvlccore.sym \
-	-version-info 9:0:0
+	-version-info 9:1:0
 libvlccore_la_DEPENDENCIES = libvlccore.sym
 if HAVE_WIN32
 libvlccore_la_DEPENDENCIES += libvlc_win32_rc.$(OBJEXT)
@@ -481,6 +481,9 @@ libvlccore_la_LIBADD += $(DBUS_LIBS)
 endif
 if HAVE_DARWIN
 libvlccore_la_LDFLAGS += -Xlinker -install_name -Xlinker @rpath/libvlccore.dylib
+if !HAVE_OSX
+libvlccore_la_LDFLAGS += -Wl,-framework,CFNetwork
+endif
 endif
 
 libvlc_win32_rc.$(OBJEXT): libvlc_win32_rc.rc $(top_srcdir)/extras/package/win32/libvlc.dll.manifest

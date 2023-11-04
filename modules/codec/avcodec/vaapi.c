@@ -87,9 +87,9 @@ static int GetVaProfile(AVCodecContext *ctx, const es_format_t *fmt,
         count = 18;
         break;
     case AV_CODEC_ID_HEVC:
-        if (fmt->i_profile == FF_PROFILE_HEVC_MAIN)
+        if (ctx->profile == FF_PROFILE_HEVC_MAIN)
             i_profile = VAProfileHEVCMain;
-        else if (fmt->i_profile == FF_PROFILE_HEVC_MAIN_10)
+        else if (ctx->profile == FF_PROFILE_HEVC_MAIN_10)
         {
             i_profile = VAProfileHEVCMain10;
             i_vlc_chroma = VLC_CODEC_VAAPI_420_10BPP;
@@ -151,9 +151,11 @@ static void Delete(vlc_va_t *va, void **hwctx)
     free(sys);
 }
 
-static int Create(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
+static int Create(vlc_va_t *va, AVCodecContext *ctx, const AVPixFmtDescriptor *desc,
+                  enum PixelFormat pix_fmt,
                   const es_format_t *fmt, picture_sys_t *p_sys)
 {
+    VLC_UNUSED(desc);
     if (pix_fmt != AV_PIX_FMT_VAAPI || p_sys == NULL)
         return VLC_EGENERIC;
 

@@ -23,6 +23,7 @@
 #endif
 
 #include "SegmentTracker.hpp"
+#include "SharedResources.hpp"
 #include "playlist/BasePlaylist.hpp"
 #include "playlist/BaseRepresentation.h"
 #include "playlist/BaseAdaptationSet.h"
@@ -53,8 +54,14 @@ TrackerEvent::Type TrackerEvent::getType() const
     return type;
 }
 
-DiscontinuityEvent::DiscontinuityEvent()
+DiscontinuityEvent::DiscontinuityEvent(uint64_t d)
     : TrackerEvent(Type::Discontinuity)
+{
+    discontinuitySequenceNumber = d;
+}
+
+SegmentGapEvent::SegmentGapEvent()
+    : TrackerEvent(Type::SegmentGap)
 {
 
 }
@@ -67,17 +74,30 @@ RepresentationSwitchEvent::RepresentationSwitchEvent(BaseRepresentation *prev,
     this->next = next;
 }
 
+RepresentationUpdatedEvent::RepresentationUpdatedEvent(BaseRepresentation * rep)
+    : TrackerEvent(Type::RepresentationUpdated)
+{
+    this->rep = rep;
+}
+
+RepresentationUpdateFailedEvent::RepresentationUpdateFailedEvent(BaseRepresentation * rep)
+    : TrackerEvent(Type::RepresentationUpdateFailed)
+{
+    this->rep = rep;
+}
+
 FormatChangedEvent::FormatChangedEvent(const StreamFormat *f)
     : TrackerEvent(Type::FormatChange)
 {
     this->format = f;
 }
 
-SegmentChangedEvent::SegmentChangedEvent(const ID &id, mtime_t starttime,
-                                         mtime_t duration, mtime_t displaytime)
+SegmentChangedEvent::SegmentChangedEvent(const ID &id, uint64_t sequence, vlc_tick_t starttime,
+                                         vlc_tick_t duration, vlc_tick_t displaytime)
     : TrackerEvent(Type::SegmentChange)
 {
     this->id = &id;
+    this->sequence = sequence;
     this->duration = duration;
     this->starttime = starttime;
     this->displaytime = displaytime;
@@ -91,8 +111,8 @@ BufferingStateUpdatedEvent::BufferingStateUpdatedEvent(const ID &id, bool enable
 }
 
 BufferingLevelChangedEvent::BufferingLevelChangedEvent(const ID &id,
-                                                       mtime_t minimum, mtime_t maximum,
-                                                       mtime_t current, mtime_t target)
+                                                       vlc_tick_t minimum, vlc_tick_t maximum,
+                                                       vlc_tick_t current, vlc_tick_t target)
     : TrackerEvent(Type::BufferingLevelChange)
 {
     this->id = &id;
@@ -102,16 +122,17 @@ BufferingLevelChangedEvent::BufferingLevelChangedEvent(const ID &id,
     this->target = target;
 }
 
-PositionChangedEvent::PositionChangedEvent()
+PositionChangedEvent::PositionChangedEvent(vlc_tick_t r)
     : TrackerEvent(Type::PositionChange)
 {
-
+    resumeTime = r;
 }
 
 SegmentTracker::SegmentTracker(SharedResources *res,
         AbstractAdaptationLogic *logic_,
         const AbstractBufferingLogic *bl,
-        BaseAdaptationSet *adaptSet)
+        BaseAdaptationSet *adaptSet,
+        SynchronizationReferences *refs)
 {
     resources = res;
     first = true;
@@ -119,6 +140,7 @@ SegmentTracker::SegmentTracker(SharedResources *res,
     bufferingLogic = bl;
     setAdaptationLogic(logic_);
     adaptationSet = adaptSet;
+    synchronizationReferences = refs;
     format = StreamFormat::Type::Unknown;
 }
 
@@ -184,21 +206,6 @@ void SegmentTracker::setAdaptationLogic(AbstractAdaptationLogic *logic_)
     registerListener(logic);
 }
 
-StreamFormat SegmentTracker::getCurrentFormat() const
-{
-    BaseRepresentation *rep = current.rep;
-    if(!rep)
-        rep = logic->getNextRepresentation(adaptationSet, nullptr);
-    if(rep)
-    {
-        /* Ensure ephemere content is updated/loaded */
-        if(rep->needsUpdate(next.number))
-            (void) rep->runLocalUpdates(resources);
-        return rep->getStreamFormat();
-    }
-    return StreamFormat();
-}
-
 void SegmentTracker::getCodecsDesc(CodecDescriptionList *descs) const
 {
     BaseRepresentation *rep = current.rep;
@@ -228,7 +235,7 @@ SegmentTracker::ChunkEntry::ChunkEntry()
     chunk = nullptr;
 }
 
-SegmentTracker::ChunkEntry::ChunkEntry(SegmentChunk *c, Position p, mtime_t s, mtime_t d, mtime_t dt)
+SegmentTracker::ChunkEntry::ChunkEntry(SegmentChunk *c, Position p, vlc_tick_t s, vlc_tick_t d, vlc_tick_t dt)
 {
     chunk = c;
     pos = p;
@@ -243,13 +250,10 @@ bool SegmentTracker::ChunkEntry::isValid() const
 }
 
 SegmentTracker::ChunkEntry
-SegmentTracker::prepareChunk(bool switch_allowed, Position pos,
-                             AbstractConnectionManager *connManager) const
+SegmentTracker::prepareChunk(bool switch_allowed, Position pos) const
 {
     if(!adaptationSet)
         return ChunkEntry();
-
-    bool b_updated = false;
 
     /* starting */
     if(!pos.isValid())
@@ -269,26 +273,33 @@ SegmentTracker::prepareChunk(bool switch_allowed, Position pos,
             temp.rep = logic->getNextRepresentation(adaptationSet, pos.rep);
             if(temp.rep && temp.rep != pos.rep)
             {
+                /* Convert our segment number if we need to */
+                temp.number = temp.rep->translateSegmentNumber(pos.number, pos.rep);
+
                 /* Ensure ephemere content is updated/loaded */
-                if(temp.rep->needsUpdate(pos.number))
-                    b_updated = temp.rep->runLocalUpdates(resources);
-                /* if we need to translate pos */
-                if(!temp.rep->consistentSegmentNumber())
-                {
-                    /* Convert our segment number */
+                if(temp.rep->needsUpdate(temp.number))
+                    temp.rep->scheduleNextUpdate(temp.number, temp.rep->runLocalUpdates(resources));
+
+                /* could have been std::numeric_limits<uint64_t>::max() if not found because not avail */
+                if(!temp.isValid()) /* try again */
                     temp.number = temp.rep->translateSegmentNumber(pos.number, pos.rep);
-                }
-                else temp.number = pos.number;
+
+                /* cancel switch that would go past playlist */
+                if(temp.isValid() && temp.rep->getMinAheadTime(temp.number) == 0)
+                    temp = Position();
             }
             if(temp.isValid())
                 pos = temp;
         }
     }
 
+    bool b_gap = true;
+    ISegment *datasegment = pos.rep->getNextMediaSegment(pos.number, &pos.number, &b_gap);
+
+    if(!datasegment)
+        return ChunkEntry();
+
     ISegment *segment = nullptr;
-
-    pos.rep->scheduleNextUpdate(pos.number, b_updated);
-
     if(!pos.init_sent)
     {
         segment = pos.rep->getInitSegment();
@@ -304,20 +315,24 @@ SegmentTracker::prepareChunk(bool switch_allowed, Position pos,
             ++pos;
     }
 
-    bool b_gap = true;
     if(!segment)
-        segment = pos.rep->getNextMediaSegment(pos.number, &pos.number, &b_gap);
+        segment = datasegment;
 
-    if(!segment)
-        return ChunkEntry();
-
-    SegmentChunk *segmentChunk = segment->toChunk(resources, connManager, pos.number, pos.rep);
+    SegmentChunk *segmentChunk = segment->toChunk(resources, pos.number, pos.rep);
     if(!segmentChunk)
         return ChunkEntry();
 
-    const Timescale timescale = pos.rep->inheritTimescale();
-    return ChunkEntry(segmentChunk, pos, VLC_TS_0 + timescale.ToTime(segment->startTime.Get()),
-                      timescale.ToTime(segment->duration.Get()), segment->getDisplayTime());
+    if(segment != datasegment) /* need to set for init */
+        segmentChunk->discontinuitySequenceNumber = datasegment->getDiscontinuitySequenceNumber();
+
+    vlc_tick_t startTime = VLC_TICK_INVALID;
+    vlc_tick_t duration = 0;
+    vlc_tick_t displayTime = datasegment->getDisplayTime();
+    /* timings belong to timeline and are not set on the segment or need profile timescale */
+    if(pos.rep->getPlaybackTimeDurationBySegmentNumber(pos.number, &startTime, &duration))
+        startTime += VLC_TICK_0;
+
+    return ChunkEntry(segmentChunk, pos, startTime, duration, displayTime);
 }
 
 void SegmentTracker::resetChunksSequence()
@@ -329,15 +344,14 @@ void SegmentTracker::resetChunksSequence()
     }
 }
 
-ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
-                                            AbstractConnectionManager *connManager)
+ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed)
 {
     if(!adaptationSet || !next.isValid())
         return nullptr;
 
     if(chunkssequence.empty())
     {
-        ChunkEntry chunk = prepareChunk(switch_allowed, next, connManager);
+        ChunkEntry chunk = prepareChunk(switch_allowed, next);
         chunkssequence.push_back(chunk);
     }
 
@@ -351,12 +365,18 @@ ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
 
     /* here next == wanted chunk pos */
     bool b_gap = (next.number != chunk.pos.number);
-    const bool b_switched = (next.rep != chunk.pos.rep);
-    const bool b_discontinuity = chunk.chunk->discontinuity;
+    const bool b_switched = (current.rep != chunk.pos.rep) || !current.rep;
+    bool b_discontinuity = chunk.chunk->discontinuity && current.isValid();
+    if(b_discontinuity && current.number == next.number)
+    {
+        /* if we are on the same segment and indexes have been sent, then discontinuity was */
+        b_discontinuity = false;
+    }
+    const uint64_t discontinuitySequenceNumber = chunk.chunk->discontinuitySequenceNumber;
 
     if(b_switched)
     {
-        notify(RepresentationSwitchEvent(next.rep, chunk.pos.rep));
+        notify(RepresentationSwitchEvent(current.rep, chunk.pos.rep));
         initializing = true;
     }
 
@@ -379,7 +399,7 @@ ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
         chunkformat = StreamFormat(p_peek, i_peek);
         /* fallback on Mime type */
         if(chunkformat == StreamFormat(StreamFormat::Type::Unknown))
-            format = StreamFormat(chunk.chunk->getContentType());
+            chunkformat = StreamFormat(chunk.chunk->getContentType());
         chunk.chunk->setStreamFormat(chunkformat);
         returnedChunk = wrappedck;
     }
@@ -403,13 +423,17 @@ ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
         initializing = false;
     }
 
-    /* Notify new segment length for stats / logic */
-    if(chunk.pos.init_sent && chunk.pos.index_sent)
-        notify(SegmentChangedEvent(adaptationSet->getID(), chunk.starttime, chunk.duration, chunk.displaytime));
+    if(b_gap)
+        notify(SegmentGapEvent());
 
     /* Handle both implicit and explicit discontinuities */
-    if(b_gap || b_discontinuity)
-        notify(DiscontinuityEvent());
+    if(b_discontinuity)
+        notify(DiscontinuityEvent(discontinuitySequenceNumber));
+
+    /* Notify new segment length for stats / logic */
+    notify(SegmentChangedEvent(adaptationSet->getID(),
+                               discontinuitySequenceNumber,
+                               chunk.starttime, chunk.duration, chunk.displaytime));
 
     if(!b_gap)
         ++next;
@@ -417,7 +441,7 @@ ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
     return returnedChunk;
 }
 
-bool SegmentTracker::setPositionByTime(mtime_t time, bool restarted, bool tryonly)
+bool SegmentTracker::setPositionByTime(vlc_tick_t time, bool restarted, bool tryonly)
 {
     Position pos = Position(current.rep, current.number);
     if(!pos.isValid())
@@ -427,12 +451,17 @@ bool SegmentTracker::setPositionByTime(mtime_t time, bool restarted, bool tryonl
         return false;
 
     /* Stream might not have been loaded at all (HLS) or expired */
-    if(pos.rep->needsUpdate(pos.number) && !pos.rep->runLocalUpdates(resources))
+    if(pos.rep->needsUpdate(pos.number))
     {
-        msg_Err(adaptationSet->getPlaylist()->getVLCObject(),
-                "Failed to update Representation %s",
-                pos.rep->getID().str().c_str());
-        return false;
+        if(!pos.rep->runLocalUpdates(resources))
+        {
+            msg_Err(adaptationSet->getPlaylist()->getVLCObject(),
+                    "Failed to update Representation %s",
+                    pos.rep->getID().str().c_str());
+            return false;
+        }
+        pos.rep->scheduleNextUpdate(pos.number, true);
+        notify(RepresentationUpdatedEvent(pos.rep));
     }
 
     if(pos.rep->getSegmentNumberByTime(time, &pos.number))
@@ -451,7 +480,7 @@ void SegmentTracker::setPosition(const Position &pos, bool restarted)
     current = Position();
     next = pos;
     resetChunksSequence();
-    notify(PositionChangedEvent());
+    notify(PositionChangedEvent(getPlaybackTime(true)));
 }
 
 SegmentTracker::Position SegmentTracker::getStartPosition() const
@@ -461,9 +490,11 @@ SegmentTracker::Position SegmentTracker::getStartPosition() const
     if(pos.rep)
     {
         /* Ensure ephemere content is updated/loaded */
-        if(pos.rep->needsUpdate(pos.number))
-            pos.rep->runLocalUpdates(resources);
+        bool b_updated = pos.rep->needsUpdate(pos.number) && pos.rep->runLocalUpdates(resources);
         pos.number = bufferingLogic->getStartSegmentNumber(pos.rep);
+        pos.rep->scheduleNextUpdate(pos.number, b_updated);
+        if(b_updated)
+            notify(RepresentationUpdatedEvent(pos.rep));
     }
     return pos;
 }
@@ -481,9 +512,9 @@ bool SegmentTracker::setStartPosition()
     return true;
 }
 
-mtime_t SegmentTracker::getPlaybackTime(bool b_next) const
+vlc_tick_t SegmentTracker::getPlaybackTime(bool b_next) const
 {
-    mtime_t time, duration;
+    vlc_tick_t time, duration;
 
     BaseRepresentation *rep = current.rep;
     if(!rep)
@@ -497,15 +528,15 @@ mtime_t SegmentTracker::getPlaybackTime(bool b_next) const
     return 0;
 }
 
-bool SegmentTracker::getMediaPlaybackRange(mtime_t *start, mtime_t *end,
-                                           mtime_t *length) const
+bool SegmentTracker::getMediaPlaybackRange(vlc_tick_t *start, vlc_tick_t *end,
+                                           vlc_tick_t *length) const
 {
     if(!current.rep)
         return false;
     return current.rep->getMediaPlaybackRange(start, end, length);
 }
 
-mtime_t SegmentTracker::getMinAheadTime() const
+vlc_tick_t SegmentTracker::getMinAheadTime() const
 {
     BaseRepresentation *rep = current.rep;
     if(!rep)
@@ -514,8 +545,12 @@ mtime_t SegmentTracker::getMinAheadTime() const
     {
         /* Ensure ephemere content is updated/loaded */
         if(rep->needsUpdate(next.number))
-            (void) rep->runLocalUpdates(resources);
-
+        {
+            bool b_updated = rep->runLocalUpdates(resources);
+            rep->scheduleNextUpdate(next.number, b_updated);
+            if(b_updated)
+                notify(RepresentationUpdatedEvent(rep));
+        }
         uint64_t startnumber = current.number;
         if(startnumber == std::numeric_limits<uint64_t>::max())
             startnumber = bufferingLogic->getStartSegmentNumber(rep);
@@ -525,13 +560,26 @@ mtime_t SegmentTracker::getMinAheadTime() const
     return 0;
 }
 
+bool SegmentTracker::getSynchronizationReference(uint64_t discontinuitysequence,
+                                                 vlc_tick_t time,
+                                                 SynchronizationReference &r) const
+{
+    return synchronizationReferences->getReference(discontinuitysequence, time, r);
+}
+
+void SegmentTracker::updateSynchronizationReference(uint64_t discontinuitysequence,
+                                                    const Times &t)
+{
+    synchronizationReferences->addReference(discontinuitysequence, t);
+}
+
 void SegmentTracker::notifyBufferingState(bool enabled) const
 {
     notify(BufferingStateUpdatedEvent(adaptationSet->getID(), enabled));
 }
 
-void SegmentTracker::notifyBufferingLevel(mtime_t min, mtime_t max,
-                                          mtime_t current, mtime_t target) const
+void SegmentTracker::notifyBufferingLevel(vlc_tick_t min, vlc_tick_t max,
+                                          vlc_tick_t current, vlc_tick_t target) const
 {
     notify(BufferingLevelChangedEvent(adaptationSet->getID(), min, max, current, target));
 }
@@ -548,13 +596,22 @@ bool SegmentTracker::bufferingAvailable() const
     return true;
 }
 
-void SegmentTracker::updateSelected()
+bool SegmentTracker::updateSelected()
 {
+    bool b_updated;
     if(current.rep && current.rep->needsUpdate(next.number))
     {
-        bool b_updated = current.rep->runLocalUpdates(resources);
+        b_updated = current.rep->runLocalUpdates(resources);
         current.rep->scheduleNextUpdate(current.number, b_updated);
+        if(b_updated)
+            notify(RepresentationUpdatedEvent(current.rep));
     }
+    else b_updated = false;
+
+    if(current.rep && current.rep->canNoLongerUpdate())
+        notify(RepresentationUpdateFailedEvent(current.rep));
+
+    return b_updated;
 }
 
 void SegmentTracker::notify(const TrackerEvent &event) const

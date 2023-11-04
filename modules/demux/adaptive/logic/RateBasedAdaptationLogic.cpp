@@ -57,9 +57,9 @@ BaseRepresentation *RateBasedAdaptationLogic::getNextRepresentation(BaseAdaptati
     if(adaptSet == nullptr)
         return nullptr;
 
-    vlc_mutex_lock(const_cast<vlc_mutex_t *>(&lock));
+    vlc_mutex_lock(&lock);
     size_t availBps = currentBps + ((currep) ? currep->getBandwidth() : 0);
-    vlc_mutex_unlock(const_cast<vlc_mutex_t *>(&lock));
+    vlc_mutex_unlock(&lock);
     if(availBps > usedBps)
         availBps -= usedBps;
     else
@@ -78,7 +78,7 @@ BaseRepresentation *RateBasedAdaptationLogic::getNextRepresentation(BaseAdaptati
 }
 
 void RateBasedAdaptationLogic::updateDownloadRate(const ID &, size_t size,
-                                                  mtime_t time, mtime_t)
+                                                  vlc_tick_t time, mtime_t)
 {
     if(unlikely(time == 0))
         return;

@@ -42,6 +42,8 @@ namespace adaptive
     using namespace playlist;
     using namespace logic;
 
+    using StreamPosition = AbstractStream::StreamPosition;
+
     class PlaylistManager
     {
         public:
@@ -57,13 +59,14 @@ namespace adaptive
             bool    started() const;
             void    stop();
 
-            AbstractStream::BufferingStatus bufferize(mtime_t, mtime_t,
+            AbstractStream::BufferingStatus bufferize(Times, mtime_t,
                                                       mtime_t, mtime_t);
-            AbstractStream::Status dequeue(mtime_t, mtime_t *);
+            AbstractStream::Status dequeue(Times, Times *);
 
             virtual bool needsUpdate() const;
             virtual bool updatePlaylist();
             virtual void scheduleNextUpdate();
+            virtual void preparsePlaylist();
 
             /* static callbacks */
             static int control_callback(demux_t *, int, va_list);
@@ -75,13 +78,13 @@ namespace adaptive
             virtual int doDemux(int64_t);
 
             void    setLivePause(bool);
-            virtual bool    setPosition(mtime_t);
-            mtime_t getResumeTime() const;
-            mtime_t getFirstDTS() const;
+            virtual bool setPosition(mtime_t, double pos = -1, bool accurate = false);
+            StreamPosition getResumePosition() const;
+            Times getFirstTimes() const;
             unsigned getActiveStreamsCount() const;
 
-            mtime_t getCurrentDemuxTime() const;
-            mtime_t getMinAheadTime() const;
+            Times getTimes(bool = false) const;
+            vlc_tick_t getMinAheadTime() const;
 
             virtual bool reactivateStream(AbstractStream *);
             bool setupPeriod();
@@ -103,6 +106,7 @@ namespace adaptive
             demux_t                             *p_demux;
             std::vector<AbstractStream *>        streams;
             BasePeriod                          *currentPeriod;
+            bool                                 b_preparsing;
 
             enum class TimestampSynchronizationPoint
             {
@@ -114,9 +118,8 @@ namespace adaptive
             struct
             {
                 TimestampSynchronizationPoint pcr_syncpoint;
-                mtime_t     i_nzpcr;
-                mtime_t     i_firstpcr;
-                vlc_mutex_t lock;
+                Times times, firsttimes;
+                mutable vlc_mutex_t lock;
                 vlc_cond_t  cond;
             } demux;
 
@@ -128,14 +131,16 @@ namespace adaptive
             struct
             {
                 bool        b_live;
-                mtime_t     i_time;
+                vlc_tick_t  i_time;
                 double      f_position;
                 mutable vlc_mutex_t lock;
-                mtime_t     playlistStart;
-                mtime_t     playlistEnd;
-                mtime_t     playlistLength;
+                vlc_tick_t  playlistStart;
+                vlc_tick_t  playlistEnd;
+                vlc_tick_t  playlistLength;
                 time_t      lastupdate;
             } cached;
+
+            SynchronizationReferences synchronizationReferences;
 
         private:
             void setBufferingRunState(bool);
@@ -147,8 +152,7 @@ namespace adaptive
             vlc_cond_t   waitcond;
             bool         b_buffering;
             bool         b_canceled;
-            mtime_t      pause_start;
-            bool         b_preparsing;
+            vlc_tick_t   pause_start;
     };
 
 }
