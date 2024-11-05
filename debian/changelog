@@ -1,8 +1,43 @@
-vlc (3.0.20-1deepin0) unstable; urgency=medium
+vlc (3.0.21-2) unstable; urgency=medium
 
-  * No source change upload against GCC 12.
+  * debian/patches: Apply WIP patches for ffmpeg 7.0 support (Closes:
+    #1072456)
 
- -- Tianyu Chen <sweetyfish@deepin.org>  Fri, 20 Sep 2024 15:30:27 +0800
+ -- Sebastian Ramacher <sramacher@debian.org>  Thu, 15 Aug 2024 12:11:01 +0200
+
+vlc (3.0.21-1) unstable; urgency=medium
+
+  * New upstream version 3.0.21
+  * debian/patches: Refresh patches
+  * debian/control: Replace obsolete packages with their new versions
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Sun, 09 Jun 2024 18:01:08 +0200
+
+vlc (3.0.20-4) unstable; urgency=medium
+
+  [ Bastian Germann ]
+  * Drop OMX support (see #1065623)
+  * Drop kFreeBSD support
+
+  [ Sebastian Ramacher ]
+  * debian/:
+    - Complete omxil removal
+    - Complete kfreebsd support removal
+  * debian/control: Bump Standards-Version
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Thu, 11 Apr 2024 22:16:25 +0200
+
+vlc (3.0.20-3) unstable; urgency=medium
+
+  * debian/control: Add missing dpkg-dev BD for time_t
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Sat, 02 Mar 2024 10:55:19 +0100
+
+vlc (3.0.20-2) unstable; urgency=medium
+
+  * debian/patches: Bump module ABI for time_t transition
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Wed, 28 Feb 2024 23:55:54 +0100
 
 vlc (3.0.20-1) unstable; urgency=medium
 

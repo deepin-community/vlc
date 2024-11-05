@@ -7,7 +7,6 @@ usr/lib/*/vlc/plugins/access/libaccess_concat_plugin.so
 usr/lib/*/vlc/plugins/access/libaccess_imem_plugin.so
 usr/lib/*/vlc/plugins/access/libaccess_mms_plugin.so
 usr/lib/*/vlc/plugins/access/libaccess_mtp_plugin.so
-usr/lib/*/vlc/plugins/access/libaccess_oss_plugin.so [oss]
 usr/lib/*/vlc/plugins/access/libaccess_realrtsp_plugin.so
 usr/lib/*/vlc/plugins/access/libattachment_plugin.so
 usr/lib/*/vlc/plugins/access/libavio_plugin.so
@@ -55,7 +54,6 @@ usr/lib/*/vlc/plugins/audio_output/libadummy_plugin.so
 usr/lib/*/vlc/plugins/audio_output/libafile_plugin.so
 usr/lib/*/vlc/plugins/audio_output/libalsa_plugin.so [alsa]
 usr/lib/*/vlc/plugins/audio_output/libamem_plugin.so
-usr/lib/*/vlc/plugins/audio_output/liboss_plugin.so [oss]
 usr/lib/*/vlc/plugins/audio_output/libpulse_plugin.so
 usr/lib/*/vlc/plugins/codec/liba52_plugin.so
 usr/lib/*/vlc/plugins/codec/libadpcm_plugin.so
@@ -81,8 +79,6 @@ usr/lib/*/vlc/plugins/codec/liblibmpeg2_plugin.so
 usr/lib/*/vlc/plugins/codec/liblpcm_plugin.so
 usr/lib/*/vlc/plugins/codec/libmpg123_plugin.so
 usr/lib/*/vlc/plugins/codec/liboggspots_plugin.so
-usr/lib/*/vlc/plugins/codec/libomxil_plugin.so [omxil]
-usr/lib/*/vlc/plugins/codec/libomxil_vout_plugin.so [omxil]
 usr/lib/*/vlc/plugins/codec/libopus_plugin.so
 usr/lib/*/vlc/plugins/codec/libpng_plugin.so
 usr/lib/*/vlc/plugins/codec/librawvideo_plugin.so
