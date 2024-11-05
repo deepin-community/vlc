@@ -111,7 +111,9 @@ confflags += \
 # macosx*: MacOX only
 # mfx: currently not supported on Linux
 # microdns: functionality already provided by avahi
+# omxil: removed from Debian (#1065623)
 # opencv: developer plugin not required by end users
+# oss: use PulseAudio instead of oss
 # projectm: broken
 # schroedinger: removed from Debian (#845037)
 # sdl-image: SDL 1.2 is deprecated (#1038590)
@@ -142,7 +144,9 @@ confflags += \
 	--disable-macosx-qtkit \
 	--disable-mfx \
 	--disable-microdns \
+	--disable-omxil \
 	--disable-opencv \
+	--disable-oss \
 	--disable-projectm \
 	--disable-schroedinger \
 	--disable-sdl-image \
@@ -156,7 +160,6 @@ confflags += \
 
 # Linux specific flags
 ifeq ($(DEB_HOST_ARCH_OS),linux)
-# V4L2 is disabled on kFreeBSD due to a build failure.
 confflags += \
 	--enable-alsa \
 	--enable-dc1394 \
@@ -168,6 +171,7 @@ confflags += \
 	--enable-wayland \
 	$(NULL)
 else
+# V4L2 is disabled on Hurd due to a build failure.
 confflags += \
 	--disable-alsa \
 	--disable-dc1394 \
@@ -194,8 +198,8 @@ removeplugins += \
 	$(NULL)
 endif
 
-# Linux and kFreeBSD specific flags (disabled on Hurd)
-ifeq (,$(filter-out linux kfreebsd,$(DEB_HOST_ARCH_OS)))
+# Linux specific flags (disabled on Hurd)
+ifeq (,$(filter-out linux,$(DEB_HOST_ARCH_OS)))
 confflags += \
 	--enable-vcd \
 	--enable-smbclient \
@@ -212,15 +216,6 @@ removeplugins += \
 	smbclient \
 	vcd \
 	$(NULL)
-endif
-
-# kFreeBSD specific flags
-ifeq (,$(filter-out kfreebsd,$(DEB_HOST_ARCH_OS)))
-confflags += --enable-oss
-else
-# Note: Use PulseAudio/ALSA on Linux instead of OSS.
-confflags += --disable-oss
-removeplugins += oss
 endif
 
 ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
@@ -262,14 +257,6 @@ ifeq (,$(filter-out powerpcspe,$(DEB_HOST_ARCH)))
 DEB_CFLAGS_MAINT_APPEND += -mtune=8548
 DEB_CXXFLAGS_MAINT_APPEND += -mtune=8548
 endif
-endif
-
-# Raspbian specifc flags
-ifeq ($(shell dpkg-vendor --derives-from Raspbian && echo yes),yes)
-confflags += --enable-omxil --enable-omxil-vout --enable-rpi-omxil
-else
-confflags += --disable-omxil
-removeplugins += omxil
 endif
 
 export DEB_BUILD_MAINT_OPTIONS
