@@ -15,7 +15,6 @@ Build-Depends:
  autopoint,
  bison,
  debhelper-compat (= 13),
- dpkg-dev (>= 1.22.5),
  gettext,
  flex,
  libaa1-dev,
@@ -55,8 +54,7 @@ Build-Depends:
  libjack-jackd2-dev | libjack-dev,
  libkate-dev (>= 0.3.0),
  liblirc-dev,
- liblua5.2-dev,
- libmad0-dev,
+ liblua5.4-dev,
  libmatroska-dev (>= 1.0.0),
  libmpcdec-dev,
  libmpg123-dev,
@@ -65,10 +63,9 @@ Build-Depends:
  libnfs-dev (>= 1.10.0) [linux-any],
  libnotify-dev,
  libogg-dev (>= 1.0),
- libopenmpt-modplug-dev (>= 0.8.9) | libmodplug-dev (>= 1:0.8.9),
+ libopenmpt-modplug-dev (>= 0.8.9),
  libopus-dev (>= 1.0.3),
  libpng-dev,
- libpostproc-dev (>= 7:3.0),
  libprotobuf-dev (>= 2.5.0),
  libpulse-dev (>= 1.0),
  libqt5svg5-dev,
@@ -97,7 +94,6 @@ Build-Depends:
  libupnp-dev,
  libv4l-dev [linux-any],
  libva-dev [linux-any],
- libvcdinfo-dev (>= 0.7.22),
  libvdpau-dev,
  libvncserver-dev (>= 0.9.9),
  libvorbis-dev,
@@ -116,20 +112,18 @@ Build-Depends:
  libxml2-dev,
  libxpm-dev,
  libzvbi-dev (>= 0.2.28),
- lua5.2,
+ lua5.4,
  pkgconf,
  protobuf-compiler,
  python3:native,
  qtbase5-dev (>= 5.6),
  qtbase5-private-dev (>= 5.6),
  wayland-protocols [linux-any],
- zlib1g-dev,
- zsh
-Standards-Version: 4.7.0
+ zlib1g-dev
+Standards-Version: 4.7.2
 Homepage: https://www.videolan.org/vlc/
 Vcs-Git: https://salsa.debian.org/multimedia-team/vlc.git
 Vcs-Browser: https://salsa.debian.org/multimedia-team/vlc
-Rules-Requires-Root: no
 
 Package: vlc
 Architecture: any
@@ -148,10 +142,10 @@ Recommends:
  vlc-plugin-video-splitter (= ${binary:Version}),
  vlc-plugin-visualization (= ${binary:Version})
 Suggests:
- vlc-plugin-fluidsynth (= ${source:Version}),
- vlc-plugin-jack (= ${source:Version}),
+ vlc-plugin-fluidsynth (= ${binary:Version}),
+ vlc-plugin-jack (= ${binary:Version}),
  vlc-plugin-pipewire [linux-any],
- vlc-plugin-svg (= ${source:Version})
+ vlc-plugin-svg (= ${binary:Version})
 Provides: mp3-decoder
 Description: multimedia player and streamer
  VLC is the VideoLAN project's media player. It plays MPEG, MPEG-2, MPEG-4,
