@@ -1,61 +1,16 @@
-vlc (3.0.22-2) unstable; urgency=medium
+vlc (3.0.23-0+deb13u1) trixie-security; urgency=medium
 
-  * debian/: Disable libmad plugin
-  * debian/patches: Apply upstream patches to fix build with ffmpeg 8.0
-    (Closes: #1115062)
+  * New upstream version 3.0.23
 
- -- Sebastian Ramacher <sramacher@debian.org>  Wed, 10 Dec 2025 12:26:35 +0100
+ -- Sebastian Ramacher <sramacher@debian.org>  Wed, 07 Jan 2026 21:01:08 +0100
 
-vlc (3.0.22-1) unstable; urgency=medium
+vlc (3.0.22-0+deb13u1) trixie-security; urgency=medium
 
   * New upstream version 3.0.22
-  * debian/rules: No longer write revision info
+  * debian/gbp.conf: Work in trixie branch
+  * debian/patches: Remove patches from upstream
 
- -- Sebastian Ramacher <sramacher@debian.org>  Fri, 05 Dec 2025 21:48:10 +0100
-
-vlc (3.0.22~rc2-1) unstable; urgency=medium
-
-  [ John Paul Adrian Glaubitz ]
-  * Fix FTBFS on powerpc (Closes: #1115385)
-
-  [ Sebastian Ramacher ]
-  * New upstream version 3.0.22~rc2
-    - Fix installation of Assamese translation (Closes: #1085961)
-
- -- Sebastian Ramacher <sramacher@debian.org>  Thu, 20 Nov 2025 10:31:49 +0100
-
-vlc (3.0.22~rc1-1) unstable; urgency=medium
-
-  * New upstream version 3.0.22~rc1
-  * debian/control:
-    - Fix version constraints on suggested plugins
-    - Drop alternative libmodplug-dev BD
-    - Remove dpkg-dev dependency satisfied in stable
-  * debian/:
-    - Remove zsh completion to make the package reproducible
-    - Switch to lua 5.4 (Closes: #1099742)
-      Check the NEWS entry of vlc-plugin-base on potential issues.
-    - Update lintian overrides for new format
-  * debian/watch: Migrate to version 5
-  * debian/rules:
-    - debhelper now skips override_dh_auto_test if nocheck is specified
-    - Remove handling of libtar as it got dropped upstream
-  * debian/patches: Remove upstream patches included in 3.0.22~rc1
-  * debian/copyright:
-    - Remove old FSF address
-    - Update copyright years
-
- -- Sebastian Ramacher <sramacher@debian.org>  Sun, 28 Sep 2025 15:26:54 +0200
-
-vlc (3.0.21-11) unstable; urgency=medium
-
-  * debian/rules: Disable postproc plugin since libpostproc is removed from
-    ffmpeg 8.0
-  * debian/control:
-    - Bump Standards-Version
-    - Remove unused BD on libvcdinfo-dev
-
- -- Sebastian Ramacher <sramacher@debian.org>  Fri, 29 Aug 2025 18:41:04 +0200
+ -- Sebastian Ramacher <sramacher@debian.org>  Sat, 06 Dec 2025 00:19:41 +0100
 
 vlc (3.0.21-10) unstable; urgency=medium
 
