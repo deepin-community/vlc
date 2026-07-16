@@ -1,3 +1,9 @@
+vlc (3.0.22-2deepin1) unstable; urgency=medium
+
+  * fix(cve): CVE-2025-51602
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Thu, 16 Jul 2026 15:09:51 +0800
+
 vlc (3.0.22-2) unstable; urgency=medium
 
   * debian/: Disable libmad plugin
