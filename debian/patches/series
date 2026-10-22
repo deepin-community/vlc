@@ -2,3 +2,4 @@
 0002-Do-not-generate-cache-during-build.patch
 0003-Bump-module-ABI-for-time_t-transition.patch
 CVE-2026-102875.patch
+CVE-2026-56711.patch
