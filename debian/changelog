@@ -1,3 +1,15 @@
+vlc (3.0.24-0+deb13u1deepin1) unstable; urgency=medium
+
+  * Rebase onto 3.0.24-0+deb13u1.
+  * CVE-2026-102875, CVE-2026-56711: fixed by upstream 3.0.24, so the quilt
+    patches carried by the previous 3.0.23-based branch are dropped.
+    - CVE-2026-102875: skins2 archive extraction path validation and URI
+      metacharacter handling (upstream 59934edb)
+    - CVE-2026-56711: picture allocation integer-overflow hardening
+      (upstream 80640fc3)
+
+ -- deepin-ci-robot <packages@deepin.org>  Wed, 28 Oct 2026 10:45:00 +0800
+
 vlc (3.0.24-0+deb13u1) trixie-security; urgency=medium
 
   * New upstream version 3.0.24
